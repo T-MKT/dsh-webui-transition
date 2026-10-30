@@ -73,7 +73,9 @@ When the system "Reduce motion" setting is on (`prefers-reduced-motion: reduce`)
 - Does not modify dsh source code and does not hand-write `package.json` / `cordis.patch.yml` into a profile.
 - Baseline is dsh `0.2.2-alpha.2`; after a dsh upgrade (especially 0.3.0 and later) the semantic selectors and client contract need re-checking.
 - Coverage depends on the host's semantic DOM (`role="menu"`, `role="dialog"` + `[data-shortcut-modal="settings"]`); changes to that structure affect coverage.
-- A glass surface's `backdrop-filter` (such as the menu's `.material` layer) pauses backdrop sampling while the open/close animation runs (about 120–220ms, a CSS backdrop-root constraint) and resumes immediately afterwards; the plugin leaves no animation state behind that affects host rendering.
+- A glass surface's `backdrop-filter` (such as the menu's `.material` layer) stays blurred throughout the transition: the menu's fade is applied to its direct children and exit ghosts no longer strip `backdrop-filter`, so the page backdrop is sampled for the whole enter/exit animation.
+- The menu container's `box-shadow` (the host elevation shadow) fades in/out together with the animation, so there is no "outline-only" frame at the start and no shadow left behind once the content has faded out.
+- If a direct child of the menu carries its own host CSS animation, the plugin briefly overrides its `opacity` (the fill is released when the animation settles); this only affects the edge case where the host animates a child's `opacity`.
 
 ## Development
 

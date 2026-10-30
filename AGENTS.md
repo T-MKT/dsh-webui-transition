@@ -19,6 +19,7 @@
 dsh-webui-transition/
 ├── .plan/
 │   ├── webui-transition.md              # 代码结构与开发进度（真源）
+│   ├── blur-during-transition.md        # 过渡期间保持玻璃层模糊 + 阴影淡入（增强计划）
 │   └── compatible-with-0.2.2-alpha.2.md # dsh 版本基线迁移计划
 ├── AGENTS.md
 ├── .gitignore

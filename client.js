@@ -596,44 +596,168 @@ window.__ModuleLoader__.load({
     // region runtime：观察 / 批量 / 入场 / 退场幽灵 / 清理
     // ============================================================
 
+    // 直接元素子级（只含 nodeType===1）。菜单的淡入淡出必须下沉到这一层：
+    // 透明度动画若落在玻璃层的祖先上，祖先会成为 backdrop-root，子级 backdrop-filter
+    // 便只能在该 root 内采样（空背景）→ 过渡期间模糊失效。
+    function directElementChildren(element) {
+      if (!isElement(element) || !element.childNodes) return [];
+      const children = [];
+      for (const child of Array.from(element.childNodes)) {
+        if (child.nodeType === 1) children.push(child);
+      }
+      return children;
+    }
+
+    // 元素的自然 opacity（读取失败/非数 → 1，动画收尾回到自然态而非硬编码 1）。
+    function naturalOpacity(element) {
+      const style = defaultComputedStyle(element);
+      if (!style) return 1;
+      let value = NaN;
+      try {
+        value = parseFloat(style.opacity);
+      } catch (error) {
+        value = NaN;
+      }
+      return Number.isFinite(value) ? value : 1;
+    }
+
+    // 元素的自然 box-shadow（none/空/读取失败 → null，表示不参与阴影淡入）。
+    function naturalBoxShadow(element) {
+      const style = defaultComputedStyle(element);
+      if (!style) return null;
+      let value = "";
+      try {
+        value = style.boxShadow || "";
+      } catch (error) {
+        return null;
+      }
+      const trimmed = String(value).trim();
+      if (!trimmed || trimmed.toLowerCase() === "none") return null;
+      return trimmed;
+    }
+
+    // 淡入 / 淡出关键帧：'in' 从 0 到自然值，'out' 从自然值到 0。
+    function fadeKeyframesFor(direction, opacity) {
+      const value = Number.isFinite(opacity) ? opacity : 1;
+      if (direction === "out") return [{ opacity: value }, { opacity: 0 }];
+      return [{ opacity: 0 }, { opacity: value }];
+    }
+
+    // 表面关键帧只吃策略里的几何 / 阴影起点；duration 与 easing 由 animator 另行传入。
+    function surfacePolicyFor(kind) {
+      const policy = KIND_POLICY[kind] || MENU_POLICY;
+      return {
+        distancePx: policy.distancePx,
+        scaleFrom: policy.scaleFrom,
+        opacityFrom: policy.opacityFrom
+      };
+    }
+
     // 入场关键帧（§2 时长策略表）。
-    function keyframesFor(kind, timing, independentTransforms) {
+    // menu/listbox 为「表面级」：只写几何 + 可选阴影淡入，不含 opacity；
+    // dialog/mask 维持整体关键帧（opacity [+translate]）。
+    function keyframesFor(kind, timing, independentTransforms, boxShadow = null) {
       const policy = timing && typeof timing === "object" ? timing : {};
       const opacityFrom = Number.isFinite(policy.opacityFrom) ? policy.opacityFrom : 0;
       const distancePx = Number.isFinite(policy.distancePx) ? policy.distancePx : 0;
       const scaleFrom = Number.isFinite(policy.scaleFrom) ? policy.scaleFrom : 1;
+
+      if (kind === "menu" || kind === "listbox") {
+        const first = {};
+        const last = {};
+        if (independentTransforms && distancePx !== 0) {
+          first.translate = "0 " + distancePx + "px";
+          last.translate = "0 0";
+          first.scale = String(scaleFrom);
+          last.scale = "1";
+        }
+        if (boxShadow) {
+          first.boxShadow = "none";
+          last.boxShadow = boxShadow;
+        }
+        return Object.keys(first).length > 0 ? [first, last] : [];
+      }
 
       const first = { opacity: opacityFrom };
       const last = { opacity: 1 };
       if (independentTransforms && kind !== "mask" && distancePx !== 0) {
         first.translate = "0 " + distancePx + "px";
         last.translate = "0 0";
-        if (kind === "menu" || kind === "listbox") {
-          first.scale = String(scaleFrom);
-          last.scale = "1";
-        }
       }
       return [first, last];
     }
 
-    // 退场关键帧 = 入场镜像。
-    function exitKeyframesFor(kind, timing, independentTransforms) {
+    // 退场关键帧 = 入场镜像（menu/listbox 同样不含 opacity）。
+    function exitKeyframesFor(kind, timing, independentTransforms, boxShadow = null) {
       const policy = timing && typeof timing === "object" ? timing : {};
       const opacityFrom = Number.isFinite(policy.opacityFrom) ? policy.opacityFrom : 0;
       const distancePx = Number.isFinite(policy.distancePx) ? policy.distancePx : 0;
       const scaleFrom = Number.isFinite(policy.scaleFrom) ? policy.scaleFrom : 1;
+
+      if (kind === "menu" || kind === "listbox") {
+        const first = {};
+        const last = {};
+        if (independentTransforms && distancePx !== 0) {
+          first.translate = "0 0";
+          last.translate = "0 " + distancePx + "px";
+          first.scale = "1";
+          last.scale = String(scaleFrom);
+        }
+        if (boxShadow) {
+          first.boxShadow = boxShadow;
+          last.boxShadow = "none";
+        }
+        return Object.keys(first).length > 0 ? [first, last] : [];
+      }
 
       const first = { opacity: 1 };
       const last = { opacity: opacityFrom };
       if (independentTransforms && kind !== "mask" && distancePx !== 0) {
         first.translate = "0 0";
         last.translate = "0 " + distancePx + "px";
-        if (kind === "menu" || kind === "listbox") {
-          first.scale = "1";
-          last.scale = String(scaleFrom);
-        }
       }
       return [first, last];
+    }
+
+    // 把一个表面拆成若干条 WAAPI 动画规格：
+    // - menu/listbox：表面几何 + 阴影一条（boxShadow 读不到则只有几何），
+    //   每个直接元素子级各一条 opacity（0 ↔ 自然值）；
+    //   无直接元素子级时回退为「表面整体」（几何/阴影 + opacity，保持旧行为）。
+    // - dialog/mask：仅表面整体一条（与关键帧函数一致）。
+    function animationSpecsFor(surface, kind, direction, independentTransforms) {
+      if (!isElement(surface)) return [];
+      const out = direction === "out";
+      const timing = surfacePolicyFor(kind);
+      const isMenuLike = kind === "menu" || kind === "listbox";
+      const boxShadow = isMenuLike ? naturalBoxShadow(surface) : null;
+      const surfaceFrames = out
+        ? exitKeyframesFor(kind, timing, independentTransforms, boxShadow)
+        : keyframesFor(kind, timing, independentTransforms, boxShadow);
+
+      if (!isMenuLike) {
+        return surfaceFrames.length > 0 ? [{ element: surface, keyframes: surfaceFrames }] : [];
+      }
+
+      const children = directElementChildren(surface);
+      if (children.length > 0) {
+        const specs = [];
+        if (surfaceFrames.length > 0) specs.push({ element: surface, keyframes: surfaceFrames });
+        for (const child of children) {
+          specs.push({ element: child, keyframes: fadeKeyframesFor(direction, naturalOpacity(child)) });
+        }
+        return specs;
+      }
+
+      // 无直接元素子级：没有可下沉的层级，淡入淡出回到表面自身。
+      const from = out ? 1 : 0;
+      const to = out ? 0 : 1;
+      if (surfaceFrames.length === 0) {
+        return [{ element: surface, keyframes: [{ opacity: from }, { opacity: to }] }];
+      }
+      const frames = surfaceFrames.map((frame) => Object.assign({}, frame));
+      frames[0].opacity = from;
+      frames[frames.length - 1].opacity = to;
+      return [{ element: surface, keyframes: frames }];
     }
 
     function defaultAnimator(element, keyframes, timing) {
@@ -763,8 +887,7 @@ window.__ModuleLoader__.load({
           node.style.setProperty("animation", "none");
           node.style.setProperty("transition", "none");
           node.style.setProperty("pointer-events", "none");
-          node.style.setProperty("backdrop-filter", "none");
-          node.style.setProperty("-webkit-backdrop-filter", "none");
+          // 不剥离 backdrop-filter：玻璃层在退场动画期间仍需采样页面背景。
         }
       }
     }
@@ -855,23 +978,22 @@ window.__ModuleLoader__.load({
         if (!canAnimate(element, intent.kind)) return;
         const timing = timingFor(intent.kind);
         if (!timing || !(timing.durationMs > 0)) return;
-        const animation = animator(
-          element,
-          keyframesFor(intent.kind, timing, supportsIndependentTransforms()),
-          timing
-        );
-        if (!animation) return;
-        ownedAnimations.add(animation);
-        let released = false;
-        whenSettled(animation, () => {
-          if (released) return;
-          released = true;
-          ownedAnimations.delete(animation);
-          // 必须释放填充态：fill:"both" 的动画结束后仍持续生效，会让带 opacity
-          // 动画的元素长期充当 backdrop-root，其内部 backdrop-filter 层（DSH 菜单
-          // 的 .material）便无法采样页面背景 → 菜单永久半透明、模糊失效。
-          cancelAnimation(animation);
-        });
+        const specs = animationSpecsFor(element, intent.kind, "in", supportsIndependentTransforms());
+        for (const spec of specs) {
+          const animation = animator(spec.element, spec.keyframes, timing);
+          if (!animation) continue;
+          ownedAnimations.add(animation);
+          let released = false;
+          whenSettled(animation, () => {
+            if (released) return;
+            released = true;
+            ownedAnimations.delete(animation);
+            // 必须释放填充态：fill:"both" 的动画结束后仍持续生效，会让带 opacity
+            // 动画的元素长期充当 backdrop-root，其内部 backdrop-filter 层（DSH 菜单
+            // 的 .material）便无法采样页面背景 → 菜单永久半透明、模糊失效。
+            cancelAnimation(animation);
+          });
+        }
       }
 
       function removeGhost(ghost) {
@@ -904,17 +1026,21 @@ window.__ModuleLoader__.load({
           if (!isElement(target)) continue;
           const timing = timingFor(surface.kind);
           if (!timing || !(timing.durationMs > 0)) continue;
-          const animation = animator(
+          const specs = animationSpecsFor(
             target,
-            exitKeyframesFor(surface.kind, timing, supportsIndependentTransforms()),
-            timing
+            surface.kind,
+            "out",
+            supportsIndependentTransforms()
           );
-          if (!animation) continue;
-          exitAnimations.add(animation);
-          whenSettled(animation, () => {
-            exitAnimations.delete(animation);
-          });
-          jobs.push(animation);
+          for (const spec of specs) {
+            const animation = animator(spec.element, spec.keyframes, timing);
+            if (!animation) continue;
+            exitAnimations.add(animation);
+            whenSettled(animation, () => {
+              exitAnimations.delete(animation);
+            });
+            jobs.push(animation);
+          }
         }
 
         if (jobs.length === 0) {
@@ -1040,6 +1166,8 @@ window.__ModuleLoader__.load({
     exports.createMotionRuntime = createMotionRuntime;
     exports.keyframesFor = keyframesFor;
     exports.exitKeyframesFor = exitKeyframesFor;
+    exports.fadeKeyframesFor = fadeKeyframesFor;
+    exports.animationSpecsFor = animationSpecsFor;
     exports.inject = [];
     exports.apply = apply;
 

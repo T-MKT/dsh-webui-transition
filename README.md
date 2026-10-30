@@ -73,7 +73,9 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 - 不修改 dsh 源码，不往 profile 手写 `package.json` / `cordis.patch.yml`。
 - 版本基线为 dsh `0.2.2-alpha.2`；dsh 升级（尤其 0.3.0 及以上）后需重新检查语义选择器与客户端契约。
 - 覆盖范围依赖宿主语义 DOM（`role="menu"`、`role="dialog"` + `[data-shortcut-modal="settings"]`）；宿主改动语义结构会影响覆盖面。
-- 玻璃表面的 `backdrop-filter`（如菜单的 `.material` 层）在开合动画进行中（约 120–220ms）会暂时停止采样背景（CSS backdrop-root 约束），动画结束后立即恢复；插件不会在动画结束后残留影响宿主渲染的动画态。
+- 玻璃表面的 `backdrop-filter`（如菜单的 `.material` 层）在过渡期间保持模糊：菜单的淡入淡出下沉到直接子级、退场幽灵不再剥离 `backdrop-filter`，因此入场/退场动画全程都在采样页面背景。
+- 菜单容器的 `box-shadow`（宿主 elevation 阴影）随动画同步淡入/淡出，不会先出现「只有阴影的轮廓」，也不会在内容淡完后残留阴影。
+- 菜单的直接子元素若自带宿主 CSS animation，插件会短暂覆盖其 `opacity`（动画结束即释放填充态）；只影响宿主在子元素上已有 `opacity` 动画的极端情况。
 
 ## 开发
 

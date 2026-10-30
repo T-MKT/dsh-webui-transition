@@ -226,8 +226,14 @@ const FACTORY_NAMES = [
   "createClassifier",
   "createCompatibility",
   "createMotionRuntime",
+];
+
+/** §2「新增」的纯关键帧/规格函数（单测直接调用，故必须经 exports 暴露）。 */
+const KEYFRAME_NAMES = [
   "keyframesFor",
   "exitKeyframesFor",
+  "fadeKeyframesFor",
+  "animationSpecsFor",
 ];
 
 /**
@@ -358,9 +364,20 @@ function timingFor(api, kind) {
   return policy.timing(kind);
 }
 
+/**
+ * 菜单表面（A1）：`[role="menu"]` 本身就是 [data-menu-material] 表面，
+ * `.material` 玻璃层是其直接子元素，另有内容容器子级。
+ * 直接子级是「淡入淡出下沉层」，因此 fixture 必须带子级。
+ */
 function buildMenu() {
   const menu = document.createElement("div");
   menu.setAttribute("role", "menu");
+  menu.setAttribute("data-menu-material", "");
+  const material = document.createElement("div");
+  material.className = "material";
+  const content = document.createElement("div");
+  content.className = "content";
+  menu.append(material, content);
   return menu;
 }
 
@@ -497,9 +514,12 @@ after(() => {
 // ---------------------------------------------------------------------------
 
 describe("client.js 装配（fake window.__ModuleLoader__）", () => {
-  clientTest("captured.factory(...) 返回的 exports 暴露 6 个冻结工厂", (t, api) => {
+  clientTest("captured.factory(...) 返回的 exports 暴露冻结的工厂与关键帧函数", (t, api) => {
     assert.ok(api && typeof api === "object", "factory 返回值必须是 exports 对象");
     for (const name of FACTORY_NAMES) {
+      assert.equal(typeof api[name], "function", `exports.${name} 必须是函数`);
+    }
+    for (const name of KEYFRAME_NAMES) {
       assert.equal(typeof api[name], "function", `exports.${name} 必须是函数`);
     }
   });
@@ -745,13 +765,20 @@ describe("region classifier：mount 分类与退场定位", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 11. keyframesFor / exitKeyframesFor：位移、缩放、独立 transform 降级
+// 11. keyframesFor / exitKeyframesFor / fadeKeyframesFor / animationSpecsFor：
+//     表面几何 + 阴影淡入淡出、直接子级淡入淡出、独立 transform 降级
 // ---------------------------------------------------------------------------
+
+const MENU_SHADOW = "rgba(0, 0, 0, 0.2) 0px 4px 8px";
 
 function translateY(frame) {
   if (frame.translate === undefined) return 0;
   const parts = String(frame.translate).trim().split(/\s+/);
   return Number.parseFloat(parts[parts.length - 1]);
+}
+
+function elementChildren(element) {
+  return Array.from(element.children);
 }
 
 function assertNoTransformKeys(frame) {
@@ -760,15 +787,21 @@ function assertNoTransformKeys(frame) {
   }
 }
 
-describe("keyframes：入场 / 退场 / 独立 transform 降级", () => {
-  clientTest("keyframesFor('menu'|'listbox') 写入 translate 与 scale", (t, api) => {
+function assertNoOpacityKeys(frame, label) {
+  assert.ok(
+    !("opacity" in frame),
+    `${label}：表面级关键帧不应包含 opacity（淡入淡出下沉到直接子级）`,
+  );
+}
+
+describe("keyframes：表面几何 / 阴影淡入淡出 / 独立 transform 降级", () => {
+  clientTest("keyframesFor('menu'|'listbox') 只写 translate 与 scale，不含 opacity", (t, api) => {
     for (const kind of ["menu", "listbox"]) {
       const frames = api.keyframesFor(kind, timingFor(api, kind), true);
       assert.ok(Array.isArray(frames) && frames.length >= 2, `${kind} 应返回 Keyframe[]`);
       const from = frames[0];
       const to = frames[frames.length - 1];
-      assert.equal(Number(from.opacity), 0, `${kind} 入场从透明开始`);
-      assert.equal(Number(to.opacity), 1, `${kind} 入场到不透明结束`);
+      for (const frame of frames) assertNoOpacityKeys(frame, `${kind} 入场`);
       assert.equal(translateY(from), -4, `${kind} 入场从 -4px 上浮`);
       assert.equal(translateY(to), 0);
       assert.equal(Number(from.scale), 0.98, `${kind} 入场缩放起点 .98`);
@@ -778,13 +811,41 @@ describe("keyframes：入场 / 退场 / 独立 transform 降级", () => {
     }
   });
 
-  clientTest("keyframesFor 在独立 transform 不支持时降级为纯 opacity", (t, api) => {
-    for (const kind of ["menu", "listbox", "dialog", "mask"]) {
+  clientTest("keyframesFor / exitKeyframesFor 用 none ↔ 计算值表达阴影淡入淡出", (t, api) => {
+    for (const kind of ["menu", "listbox"]) {
+      const timing = timingFor(api, kind);
+      const entry = api.keyframesFor(kind, timing, true, MENU_SHADOW);
+      assert.equal(entry[0].boxShadow, "none", `${kind} 入场首帧无阴影`);
+      assert.equal(
+        entry[entry.length - 1].boxShadow,
+        MENU_SHADOW,
+        "入场末帧为元素计算阴影（不改写阴影字符串）",
+      );
+      assert.equal(translateY(entry[0]), -4, "阴影与位移在同一条关键帧对象上");
+      for (const frame of entry) assertNoOpacityKeys(frame, `${kind} 入场`);
+
+      const exit = api.exitKeyframesFor(kind, timing, true, MENU_SHADOW);
+      assert.equal(exit[0].boxShadow, MENU_SHADOW);
+      assert.equal(exit[exit.length - 1].boxShadow, "none");
+      for (const frame of exit) assertNoOpacityKeys(frame, `${kind} 退场`);
+    }
+  });
+
+  clientTest("独立 transform 不支持时：dialog/mask 退化为 opacity，menu/listbox 只剩阴影", (t, api) => {
+    for (const kind of ["dialog", "mask"]) {
       const frames = api.keyframesFor(kind, timingFor(api, kind), false);
       assert.ok(frames.length >= 2);
       assert.equal(Number(frames[0].opacity), 0);
       assert.equal(Number(frames[frames.length - 1].opacity), 1);
       for (const frame of frames) assertNoTransformKeys(frame);
+    }
+    for (const kind of ["menu", "listbox"]) {
+      assert.deepEqual(api.keyframesFor(kind, timingFor(api, kind), false), [], "无几何也无阴影 → []");
+      assert.deepEqual(api.exitKeyframesFor(kind, timingFor(api, kind), false), []);
+      const withShadow = api.keyframesFor(kind, timingFor(api, kind), false, MENU_SHADOW);
+      assert.equal(withShadow[0].boxShadow, "none", "只剩阴影淡入");
+      assert.equal(withShadow[withShadow.length - 1].boxShadow, MENU_SHADOW);
+      for (const frame of withShadow) assertNoTransformKeys(frame);
     }
   });
 
@@ -803,15 +864,14 @@ describe("keyframes：入场 / 退场 / 独立 transform 降级", () => {
     for (const frame of frames) assertNoTransformKeys(frame);
   });
 
-  clientTest("exitKeyframesFor('menu'|'listbox') 为入场镜像", (t, api) => {
+  clientTest("exitKeyframesFor('menu'|'listbox') 为几何镜像且不含 opacity", (t, api) => {
     for (const kind of ["menu", "listbox"]) {
       const frames = api.exitKeyframesFor(kind, timingFor(api, kind), true);
-      const from = frames[0];
-      const to = frames[frames.length - 1];
-      assert.equal(Number(from.opacity), 1, `${kind} 退场从不透明开始`);
-      assert.equal(Number(to.opacity), 0, `${kind} 退场到透明结束`);
-      assert.equal(translateY(to), -4, `${kind} 退场镜像到 -4px`);
-      assert.equal(Number(to.scale), 0.98, `${kind} 退场镜像到 .98`);
+      assert.equal(frames.length, 2, `${kind} 退场应返回两帧`);
+      for (const frame of frames) assertNoOpacityKeys(frame, `${kind} 退场`);
+      assert.equal(translateY(frames[0]), 0);
+      assert.equal(translateY(frames[frames.length - 1]), -4, `${kind} 退场镜像到 -4px`);
+      assert.equal(Number(frames[frames.length - 1].scale), 0.98, `${kind} 退场镜像到 .98`);
       for (const frame of frames) assert.ok(!("transform" in frame));
     }
   });
@@ -831,53 +891,194 @@ describe("keyframes：入场 / 退场 / 独立 transform 降级", () => {
   });
 });
 
+describe("animationSpecsFor：表面 + 直接子级的拆分", () => {
+  clientTest("menu 入场：表面一条（几何 + 阴影），每个直接子级各一条 opacity", (t, api) => {
+    const menu = buildMenu();
+    menu.style.boxShadow = MENU_SHADOW;
+    document.body.appendChild(menu);
+    try {
+      const children = elementChildren(menu);
+      const specs = api.animationSpecsFor(menu, "menu", "in", true);
+
+      const surfaceSpec = specs.find((spec) => spec.element === menu);
+      assert.ok(surfaceSpec, "表面必须有几何/阴影动画");
+      for (const frame of surfaceSpec.keyframes) assertNoOpacityKeys(frame, "menu 入场表面");
+      assert.equal(surfaceSpec.keyframes[0].boxShadow, "none", "阴影从 none 淡入");
+      assert.equal(
+        surfaceSpec.keyframes[surfaceSpec.keyframes.length - 1].boxShadow,
+        window.getComputedStyle(menu).boxShadow,
+        "阴影末帧取元素计算值",
+      );
+      assert.equal(translateY(surfaceSpec.keyframes[0]), -4);
+
+      const childSpecs = specs.filter((spec) => spec.element !== menu);
+      assert.equal(childSpecs.length, children.length, "每个直接元素子级各一条动画");
+      assert.deepEqual(
+        childSpecs.map((spec) => spec.element),
+        children,
+      );
+      for (const spec of childSpecs) {
+        assert.equal(Number(spec.keyframes[0].opacity), 0, "子级从透明淡入");
+        assert.equal(
+          Number(spec.keyframes[spec.keyframes.length - 1].opacity),
+          1,
+          "子级淡入到自然 opacity",
+        );
+      }
+    } finally {
+      menu.remove();
+    }
+  });
+
+  clientTest("menu 无直接子级时回退为表面整体动画（保持旧行为）", (t, api) => {
+    const menu = document.createElement("div");
+    menu.setAttribute("role", "menu");
+    menu.style.boxShadow = MENU_SHADOW;
+    document.body.appendChild(menu);
+    try {
+      const specs = api.animationSpecsFor(menu, "menu", "in", true);
+      assert.equal(specs.length, 1, "无子级时只有表面一条");
+      assert.equal(specs[0].element, menu);
+      const frames = specs[0].keyframes;
+      assert.equal(Number(frames[0].opacity), 0);
+      assert.equal(Number(frames[frames.length - 1].opacity), 1);
+      assert.equal(translateY(frames[0]), -4);
+    } finally {
+      menu.remove();
+    }
+  });
+
+  clientTest("menu 退场：阴影从计算值淡出、子级淡出到 0", (t, api) => {
+    const menu = buildMenu();
+    menu.style.boxShadow = MENU_SHADOW;
+    document.body.appendChild(menu);
+    try {
+      const specs = api.animationSpecsFor(menu, "menu", "out", true);
+      const surfaceSpec = specs.find((spec) => spec.element === menu);
+      assert.equal(surfaceSpec.keyframes[0].boxShadow, window.getComputedStyle(menu).boxShadow);
+      assert.equal(
+        surfaceSpec.keyframes[surfaceSpec.keyframes.length - 1].boxShadow,
+        "none",
+        "阴影淡出到 none",
+      );
+      for (const frame of surfaceSpec.keyframes) assertNoOpacityKeys(frame, "menu 退场表面");
+
+      const childSpecs = specs.filter((spec) => spec.element !== menu);
+      assert.equal(childSpecs.length, elementChildren(menu).length);
+      for (const spec of childSpecs) {
+        assert.equal(Number(spec.keyframes[0].opacity), 1, "子级从自然 opacity 淡出");
+        assert.equal(Number(spec.keyframes[spec.keyframes.length - 1].opacity), 0);
+      }
+    } finally {
+      menu.remove();
+    }
+  });
+
+  clientTest("dialog 规格保持整体一条（opacity + 位移），不拆分", (t, api) => {
+    const { panel } = buildSettingsOverlay();
+    document.body.appendChild(panel);
+    try {
+      const specs = api.animationSpecsFor(panel, "dialog", "in", true);
+      assert.equal(specs.length, 1, "dialog 不拆分");
+      assert.equal(specs[0].element, panel);
+      assert.equal(Number(specs[0].keyframes[0].opacity), 0);
+      assert.equal(translateY(specs[0].keyframes[0]), 12);
+    } finally {
+      panel.remove();
+    }
+  });
+
+  clientTest("fadeKeyframesFor 生成 in / out 两端帧", (t, api) => {
+    assert.deepEqual(api.fadeKeyframesFor("in", 1), [{ opacity: 0 }, { opacity: 1 }]);
+    assert.deepEqual(api.fadeKeyframesFor("out", 0.5), [{ opacity: 0.5 }, { opacity: 0 }]);
+    assert.deepEqual(api.fadeKeyframesFor("in", NaN), [{ opacity: 0 }, { opacity: 1 }], "非法值回退 1");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // 12. region runtime：观察 / 同帧去重 / 退场幽灵 / dispose / reduced-motion / 降级
 // ---------------------------------------------------------------------------
 
 describe("region runtime：观察、去重、退场幽灵、清理", () => {
-  clientTest("插入 role=menu 后在下一帧播放入场动画", async (t, api) => {
+  clientTest("插入 role=menu 后在下一帧播放：表面几何 + 每个直接子级淡入", async (t, api) => {
     const harness = createHarness({ clientApi: api });
     const menu = buildMenu();
     document.body.appendChild(menu);
     await nextTask();
     flushAllFrames(harness.scheduler);
 
-    const call = animateCalls.find((item) => item.element === menu);
-    assert.ok(call, "菜单应被 animate 入场");
-    assert.ok(Array.isArray(call.keyframes) && call.keyframes.length >= 2, "应有入场关键帧");
+    const surfaceCall = animateCalls.find((item) => item.element === menu);
+    assert.ok(surfaceCall, "菜单表面应被 animate 入场");
+    assert.ok(
+      Array.isArray(surfaceCall.keyframes) && surfaceCall.keyframes.length >= 2,
+      "应有入场关键帧",
+    );
     const timing = harness.policy.timing("menu");
-    assert.equal(call.options.duration, timing.durationMs, "duration 应来自 policy.timing");
+    assert.equal(surfaceCall.options.duration, timing.durationMs, "duration 应来自 policy.timing");
     assert.equal(
-      normalizeEasing(call.options.easing),
+      normalizeEasing(surfaceCall.options.easing),
       normalizeEasing(timing.easing),
       "easing 应来自 policy.timing",
     );
-    assert.equal(call.options.fill, "both", "填充模式应为 both");
-    assert.equal(Number(call.keyframes[0].opacity), 0, "入场从透明开始");
+    assert.equal(surfaceCall.options.fill, "both", "填充模式应为 both");
+    assert.equal(translateY(surfaceCall.keyframes[0]), -4, "表面从 -4px 上浮");
+
+    const children = elementChildren(menu);
+    const childCalls = animateCalls.filter((item) => children.includes(item.element));
+    assert.equal(childCalls.length, children.length, "每个直接子级各一条入场动画");
+    for (const call of childCalls) {
+      assert.equal(Number(call.keyframes[0].opacity), 0, "子级从透明开始");
+      assert.equal(call.options.duration, timing.durationMs, "子级与表面共用 timing");
+    }
   });
 
-  clientTest("入场动画 settle 后释放填充态，不残留 fill:both 动画", async (t, api) => {
+  clientTest("菜单入场不产生 surface opacity 动画（模糊不因祖先 opacity 失效）", async (t, api) => {
+    const harness = createHarness({ clientApi: api });
+    const menu = buildMenu();
+    menu.style.boxShadow = MENU_SHADOW;
+    document.body.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const surfaceCalls = animateCalls.filter((item) => item.element === menu);
+    assert.equal(surfaceCalls.length, 1, "表面只有一条动画（几何 + 阴影）");
+    for (const frame of surfaceCalls[0].keyframes) assertNoOpacityKeys(frame, "menu 表面");
+    assert.equal(surfaceCalls[0].keyframes[0].boxShadow, "none", "阴影随入场淡入");
+    assert.equal(
+      surfaceCalls[0].keyframes[surfaceCalls[0].keyframes.length - 1].boxShadow,
+      window.getComputedStyle(menu).boxShadow,
+      "阴影末帧为元素计算值",
+    );
+  });
+
+  clientTest("入场动画 settle 后释放填充态，表面与子级都不残留 fill:both 动画", async (t, api) => {
     const harness = createHarness({ clientApi: api });
     const menu = buildMenu();
     document.body.appendChild(menu);
     await nextTask();
     flushAllFrames(harness.scheduler);
 
-    const animation = fakeAnimations.find((item) => item.element === menu);
-    assert.ok(animation, "菜单应播放入场动画");
-    assert.equal(animation.options.fill, "both", "动画期间依赖 fill:both 维持首尾帧");
-    assert.equal(menu.getAnimations().length, 1, "动画进行中应可观测到填充态动画");
+    const children = elementChildren(menu);
+    const animatedElements = [menu, ...children];
+    const animations = fakeAnimations.filter((item) => animatedElements.includes(item.element));
+    assert.equal(animations.length, animatedElements.length, "表面与每个直接子级各一条动画");
+    for (const animation of animations) {
+      assert.equal(animation.options.fill, "both", "动画期间依赖 fill:both 维持首尾帧");
+    }
+    assert.equal(menu.getAnimations().length, 1, "动画进行中应可观测到表面的填充态动画");
 
     await settleAnimations();
 
-    assert.equal(animation.playState, "idle", "settle 后动画应回到 idle");
-    assert.equal(animation.cancelled, true, "settle 后应 cancel 释放填充态");
+    for (const animation of animations) {
+      assert.equal(animation.playState, "idle", "settle 后动画应回到 idle");
+      assert.equal(animation.cancelled, true, "settle 后应 cancel 释放填充态");
+    }
     assert.deepEqual(
       menu.getAnimations(),
       [],
       "不残留 fill:both 动画：否则元素长期充当 backdrop-root，子级 backdrop-filter 失效",
     );
+    for (const child of children) assert.deepEqual(child.getAnimations(), [], "子级也不残留动画");
   });
 
   clientTest("同帧内同元素同 kind 去重，只 animate 一次", (t, api) => {
@@ -893,6 +1094,62 @@ describe("region runtime：观察、去重、退场幽灵、清理", () => {
 
     const calls = animateCalls.filter((item) => item.element === menu);
     assert.equal(calls.length, 1, "同一帧内同一元素同一 kind 应只播放一次");
+  });
+
+  clientTest("移除菜单产生退场幽灵：阴影淡出、子级淡出、玻璃层不被剥离，settle 后移除", async (t, api) => {
+    const harness = createHarness({ clientApi: api });
+    const stage = document.createElement("div");
+    document.body.appendChild(stage);
+    const menu = buildMenu();
+    menu.style.boxShadow = MENU_SHADOW;
+    const material = menu.querySelector(".material");
+    material.style.setProperty("backdrop-filter", "blur(24px)");
+    material.style.setProperty("-webkit-backdrop-filter", "blur(24px)");
+    stage.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+    await settleAnimations(); // 先结清入场动画
+    resetAnimationLog();
+
+    const naturalShadow = window.getComputedStyle(menu).boxShadow;
+    menu.remove();
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const ghost = document.querySelector("[data-dsh-transition-ghost]");
+    assert.ok(ghost, "退场应插入幽灵节点");
+    const ghostMaterial = ghost.querySelector(".material");
+    assert.equal(
+      ghostMaterial.style.getPropertyValue("backdrop-filter"),
+      "blur(24px)",
+      "幽灵不得剥离 backdrop-filter（退场期间仍需采样背景）",
+    );
+    // jsdom 的 cssstyle 不保留 -webkit- 前缀属性，故只锁定标准属性未被覆盖成 none。
+
+    const surfaceCall = animateCalls.find((item) => item.element === ghost);
+    assert.ok(surfaceCall, "幽灵根应播表面退场动画");
+    for (const frame of surfaceCall.keyframes) assertNoOpacityKeys(frame, "幽灵根");
+    assert.equal(surfaceCall.keyframes[0].boxShadow, naturalShadow, "阴影从计算值开始淡出");
+    assert.equal(
+      surfaceCall.keyframes[surfaceCall.keyframes.length - 1].boxShadow,
+      "none",
+      "阴影淡出到 none，不残留在已淡完的内容后面",
+    );
+
+    const ghostChildren = elementChildren(ghost);
+    const childCalls = animateCalls.filter((item) => ghostChildren.includes(item.element));
+    assert.equal(childCalls.length, ghostChildren.length, "每个幽灵子级各一条淡出");
+    for (const call of childCalls) {
+      assert.equal(Number(call.keyframes[0].opacity), 1);
+      assert.equal(Number(call.keyframes[call.keyframes.length - 1].opacity), 0);
+    }
+
+    await settleAnimations();
+    assert.equal(
+      document.querySelectorAll("[data-dsh-transition-ghost]").length,
+      0,
+      "动画 settle 后幽灵应被移除",
+    );
   });
 
   clientTest("移除设置面板产生退场幽灵：aria-hidden/inert/pointer-events，settle 后移除", async (t, api) => {
@@ -967,7 +1224,7 @@ describe("region runtime：观察、去重、退场幽灵、清理", () => {
     await settleAnimations();
   });
 
-  clientTest("独立 transform 不支持时降级为 opacity-only 动画", async (t, api) => {
+  clientTest("独立 transform 不支持时降级：表面只剩阴影、子级淡入淡出仍在", async (t, api) => {
     if (!degradedClient) {
       t.skip("独立 transform 降级实例未能加载（client.js 缺 CSS.supports 依赖路径？）");
       return;
@@ -981,15 +1238,25 @@ describe("region runtime：观察、去重、退场幽灵、清理", () => {
       // 用「模块求值期 CSS.supports 就为 false」的实例：兼容实现缓存与逐次求值两种情况
       const harness = createHarness({ clientApi: degradedClient });
       const menu = buildMenu();
+      menu.style.boxShadow = MENU_SHADOW;
       document.body.appendChild(menu);
       await nextTask();
       flushAllFrames(harness.scheduler);
 
-      const call = animateCalls.find((item) => item.element === menu);
-      assert.ok(call, "降级模式下仍应播放动画");
-      for (const frame of call.keyframes) {
-        assert.ok("opacity" in frame, "降级关键帧应含 opacity");
+      const surfaceCall = animateCalls.find((item) => item.element === menu);
+      assert.ok(surfaceCall, "降级模式下表面仍播阴影淡入");
+      for (const frame of surfaceCall.keyframes) {
         assertNoTransformKeys(frame);
+        assertNoOpacityKeys(frame, "降级表面");
+        assert.ok("boxShadow" in frame, "降级表面关键帧只剩 boxShadow");
+      }
+
+      const children = elementChildren(menu);
+      const childCalls = animateCalls.filter((item) => children.includes(item.element));
+      assert.equal(childCalls.length, children.length, "子级淡入不依赖独立 transform");
+      for (const call of childCalls) {
+        assert.equal(Number(call.keyframes[0].opacity), 0);
+        for (const frame of call.keyframes) assertNoTransformKeys(frame);
       }
     } finally {
       globalThis.CSS = realGlobalCSS;

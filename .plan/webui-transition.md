@@ -83,12 +83,18 @@ compatibility.canAnimate（排除区 / 不可见 / 宿主已有动画 / data-dsh
   ▼
 policy.timing(kind)（读 --ds-transition-* token + clamp + reduced-motion 归零）
   ▼
-WAAPI element.animate(keyframesFor(kind, timing, independent), { duration, easing, fill:"both" })
-  · 入场 settle 后 cancel() 释放填充态：fill:"both" 若长期生效，会让带 opacity 动画的表面持续充当
-    backdrop-root，其内部玻璃层（菜单 .material 的 backdrop-filter）将永久无法采样页面背景
+animationSpecsFor(surface, kind, direction, independent) → AnimationSpec[]
+  · menu/listbox：表面一条（translate/scale + boxShadow none ↔ 计算值，**无 opacity**）
+                  + 每个直接元素子级一条 opacity（0 ↔ 自然值）；无子级时回退为表面整体
+  · dialog/mask：表面整体一条（opacity [+translate]，与旧行为一致）
+  ▼ 每个 spec：element.animate(keyframes, { duration, easing, fill:"both" })
+  · 入场 settle 后 cancel() 释放填充态：fill:"both" 若长期生效，会让带 opacity 动画的元素持续充当
+    backdrop-root，其内部玻璃层（菜单 .material 的 backdrop-filter）将永久无法采样页面背景；
+    菜单的 opacity 动画已下沉到直接子级，表面自身不做 opacity，故过渡期间也保持模糊。
   · 退场：classifyRemoval 定位被删的 dialog(+mask)/menu → cloneNode(true) 幽灵 → prepareGhost
-    （aria-hidden + inert + pointer-events:none + 剥 id/aria-* 引用 + tabindex=-1 + backdrop-filter:none）
-    → 插回原位置播 exitKeyframesFor → 全部 settle 后移除幽灵
+    （aria-hidden + inert + pointer-events:none + 剥 id/aria-* 引用 + tabindex=-1；**不剥 backdrop-filter**）
+    → 插回原位置按 animationSpecsFor(..., "out", ...) 播放（菜单：克隆根几何 + 阴影淡出 + 子级淡出）
+    → 全部 settle 后移除幽灵
   · 清理：ctx.effect 返回值 → dispose()（断 observer、取消 rAF、cancel 全部动画、删幽灵、删注入样式、还原状态标记）
 ```
 
@@ -212,7 +218,12 @@ function exitKeyframesFor(kind, timing, independentTransforms)   // → Keyframe
 - [x] 缺陷修复（2026-10-30，实机检查发现）：入场动画 `fill:"both"` 结束后未释放填充态，`[role="menu"]`（`[data-menu-material]` 表面，即 `.material` 的父级）长期充当 backdrop-root，导致全部 `.material` 的 `--dsw-menu-backdrop-filter` 失效（菜单半透明、模糊消失）。
   - 修复：`applyEntry` 入场动画 settle 时 `cancel()` 释放填充态（对齐 dsh-motion 的 settle 语义）；新增单测「入场动画 settle 后释放填充态，不残留 fill:both 动画」。
   - 验证：无头 Chromium + CDP 连 127.0.0.1:3080 的 0.2.2-alpha.2 GUI —— 修复前菜单区域高清条纹清晰可见（无模糊、红色/蓝色像素各 ~48%），修复后完全模糊（红/蓝 0%）；菜单入场动画正常播放后释放、退场幽灵正常出现并移除、设置面板 mask+panel 动画正常释放，console 无插件异常。
-  - 已知边界：受 CSS backdrop-root 约束，带 opacity 的入场动画进行中（约 120–160ms）玻璃层无法采样背景，动画结束后立即恢复；插件不在动画结束后残留任何影响宿主渲染的动画态。
+  - 已知边界：插件不在动画结束后残留任何影响宿主渲染的动画态。
+- [x] 增强（2026-10-30）：**过渡期间保持玻璃层模糊** + 菜单容器阴影同步淡入淡出（详见 `.plan/blur-during-transition.md`）：
+  - 菜单淡入淡出从 `[data-menu-material]` 表面下沉到直接子级（`.material` 玻璃层 + 内容容器）；表面只做几何 + `box-shadow` 淡入/淡出，不再有表面 opacity 动画（祖先 opacity 会产生 backdrop-root）。
+  - 退场幽灵不再剥离 `backdrop-filter` / `-webkit-backdrop-filter`（其余清理不变），关闭动画同样保持磨砂。
+  - 玻璃 dialog（`backdrop-filter` 与 `role="dialog"` 同元素）的退场同样保持模糊。
+  - 已知边界更新：过渡期间不再暂停采样背景；直接子元素若自带宿主 CSS animation，其 opacity 会被插件短暂覆盖。
 - **完成判据**：用户确认两处动画符合预期；console 干净；卸载（`remove_bundle` 或停用）后界面还原为官方行为
 
 ### 3.5 收尾
