@@ -138,6 +138,8 @@ function exitKeyframesFor(kind, timing, independentTransforms)   // → Keyframe
 | mask | `--ds-transition-duration` | 180ms | 140–220ms | opacity 0 |
 | （reduced-motion） | — | — | 全部 `durationMs=0` | 跳过动画与幽灵 |
 
+`MotionTiming.distancePx` 取**带符号**的入场位移：menu/listbox `-4`、dialog `12`、mask `0`。`keyframesFor` 直接写入 `translate`，`exitKeyframesFor` 镜像到同一值（实现与单测按此约定）。
+
 缓动：`--ds-ease-in-out`（缺失时 `cubic-bezier(.4,0,.2,1)`）；dialog 用 `cubic-bezier(.22,1,.36,1)`。独立 transform：`CSS.supports('translate','0 1px') && CSS.supports('scale','.98')` 才写 `translate`/`scale` 关键帧，否则退化为 opacity-only；**绝不写 `transform`**（宿主定位属性）。
 
 ## 3 开发进度
@@ -146,48 +148,48 @@ function exitKeyframesFor(kind, timing, independentTransforms)   // → Keyframe
 
 #### 3.1.1 清单与占位文件
 
-- [ ] `package.json`：name `@tak1208/dsh-webui-transition`、version `0.1.0`、`type: module`、`exports`（`.` / `./client` / `./package.json`）、`files`、`description`、`license: MIT`、`dsh.bundle.patch`、`dsh.client{ platform:"web", immediately:true, inject:[] }`、`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`
-- [ ] `cordis.patch.yml`：insert 一行 `id: dsh-webui-transition, name: '@tak1208/dsh-webui-transition'`
-- [ ] `index.js`：`export function apply() {}`
-- [ ] `.gitignore`（node_modules、AGENTS.local.md、.DS_Store 等）、`LICENSE`（MIT）、`COMPATIBLE_VERSION`（`0.2.2-alpha.2` / 当日日期；待插件代码落地时创建，本轮不创建）
-- [ ] `AGENTS.md` 补全项目地图（照 dsh 插件仓库常见格式）
+- [x] `package.json`：name `@tak1208/dsh-webui-transition`、version `0.1.0`、`type: module`、`exports`（`.` / `./client` / `./package.json`）、`files`、`description`、`license: MIT`、`dsh.bundle.patch`、`dsh.client{ platform:"web", immediately:true, inject:[] }`、`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`
+- [x] `cordis.patch.yml`：insert 一行 `id: dsh-webui-transition, name: '@tak1208/dsh-webui-transition'`
+- [x] `index.js`：`export function apply() {}`
+- [x] `.gitignore`（node_modules、AGENTS.local.md、.DS_Store 等）、`LICENSE`（MIT）、`COMPATIBLE_VERSION`（`0.2.2-alpha.2` / 当日日期；待插件代码落地时创建，本轮不创建）
+- [x] `AGENTS.md` 补全项目地图（照 dsh 插件仓库常见格式）
 - **完成判据**：`node --check index.js` 通过；`pnpm install --ignore-scripts` 无报错（pnpm-lock 生成）；`git commit -m "chore(scaffold): 完成 .plan/webui-transition.md §3.1"`
 
 ### 3.2 客户端动效运行时（三路并行，用 Agent Teams：Lead 建 3 个 teammate + 共享任务板，写入范围互不重叠）
 
 #### 3.2.1 Agent A：`client.js` 全量运行时
 
-- [ ] region policy：`createPolicy`——读 `--ds-transition-duration(-fast/-slow)` 与 `--ds-ease-in-out`（`getComputedStyle(document.documentElement)`）、`parseCssDuration` + clamp、缓动白名单校验、live `prefers-reduced-motion`（subscribe）
-- [ ] region classifier：`createClassifier`——mount 分类（`role=menu/listbox/dialog`、dialog 配 mask）、`classifyRemoval`（在删除子树中定位 dialog(+mask)/menu/listbox，按 §2 `RemovalSurface` 输出）、硬排除 + `OBSERVED_ATTRIBUTES`
-- [ ] region compatibility：`createCompatibility`——排除区/可见性（hidden、aria-hidden 祖先、display:none）/宿主已有动画（`getAnimations()` 未 finished 或 `animation-name` 非 none）三重门卫
-- [ ] region runtime：`createMotionRuntime`——MutationObserver（attributeOldValue + attributeFilter）、同帧去重、rAF flush、入场 `element.animate(keyframesFor(...), { duration, easing, fill:'both' })`、退场幽灵（clone → `prepareGhost` → 插回原位置 → `exitKeyframesFor` → settle 后移除）、`supportsIndependentTransforms` 降级、`dispose()` 完整清理
-- [ ] region register：`window.__ModuleLoader__.load({ id: '@tak1208/dsh-webui-transition', factory })`，`factory` 返回 `{ inject: [], apply(ctx) { ctx.effect(() => runtime.start(), 'dsh-webui-transition: runtime') } }`；顶层直接注册（不写「无 window 时跳过注册」分支）；Node 单测先注入 fake `window.__ModuleLoader__`，再动态 import 该文件、从捕获的 factory 取 `exports`
-- [ ] 注入一张 `<style data-dsh-transition-style>`：仅承载「状态色过渡」等静态规则（可无），随 dispose 移除（宿主不兜底清理插件注入的样式：0.2.1-alpha.1 起只认领 factory 执行期间新增的无主 style，因此 `dispose()` 内 `remove()` 是唯一清理路径）
+- [x] region policy：`createPolicy`——读 `--ds-transition-duration(-fast/-slow)` 与 `--ds-ease-in-out`（`getComputedStyle(document.documentElement)`）、`parseCssDuration` + clamp、缓动白名单校验、live `prefers-reduced-motion`（subscribe）
+- [x] region classifier：`createClassifier`——mount 分类（`role=menu/listbox/dialog`、dialog 配 mask）、`classifyRemoval`（在删除子树中定位 dialog(+mask)/menu/listbox，按 §2 `RemovalSurface` 输出）、硬排除 + `OBSERVED_ATTRIBUTES`
+- [x] region compatibility：`createCompatibility`——排除区/可见性（hidden、aria-hidden 祖先、display:none）/宿主已有动画（`getAnimations()` 未 finished 或 `animation-name` 非 none）三重门卫
+- [x] region runtime：`createMotionRuntime`——MutationObserver（attributeOldValue + attributeFilter）、同帧去重、rAF flush、入场 `element.animate(keyframesFor(...), { duration, easing, fill:'both' })`、退场幽灵（clone → `prepareGhost` → 插回原位置 → `exitKeyframesFor` → settle 后移除）、`supportsIndependentTransforms` 降级、`dispose()` 完整清理
+- [x] region register：`window.__ModuleLoader__.load({ id: '@tak1208/dsh-webui-transition', factory })`，`factory` 返回 `{ inject: [], apply(ctx) { ctx.effect(() => runtime.start(), 'dsh-webui-transition: runtime') } }`；顶层直接注册（不写「无 window 时跳过注册」分支）；Node 单测先注入 fake `window.__ModuleLoader__`，再动态 import 该文件、从捕获的 factory 取 `exports`
+- [x] 注入一张 `<style data-dsh-transition-style>`：仅承载「状态色过渡」等静态规则（可无），随 dispose 移除（宿主不兜底清理插件注入的样式：0.2.1-alpha.1 起只认领 factory 执行期间新增的无主 style，因此 `dispose()` 内 `remove()` 是唯一清理路径）
 - **完成判据**：`node --check client.js` 通过；用 fake `window.__ModuleLoader__` 捕获 factory 后取出 `exports`，断言 `createPolicy/createClassifier/createCompatibility/createMotionRuntime/keyframesFor/exitKeyframesFor` 六个函数齐全（不依赖 ESM 具名导出）
 
 #### 3.2.2 Agent B：`test/runtime.test.mjs`
 
-- [ ] jsdom 环境装配：`window.__ModuleLoader__` fake（`load: (rec) => { captured = rec }`）、`document.documentElement` 注入 `--ds-transition-duration*` 变量（`style.setProperty`）、`Element.prototype.animate` fake（记录调用并返回可 settle 的假 animation）；单测先注入该 fake，再动态 import `client.js`，从 `captured.factory(...)` 的返回值取 `exports` 断言（不直接取具名导出）
-- [ ] policy 测试：token 解析与 clamp、非法缓动回退、reduced-motion 下 `timing()` 全零、live 切换触发 subscribe
-- [ ] classifier 测试：`role=menu` 插入产生 mount intent；dialog+mask 成对；`classifyRemoval` 定位 dialog/mask/menu；排除区（`data-dsh-transition="off"`、`[role="tooltip"]`）不产出
-- [ ] runtime 测试：同帧去重（同一元素同 kind 只 animate 一次）、退场幽灵 `aria-hidden`/`inert`/`pointer-events:none` 且在 settle 后移除、`dispose()` 后观察器断开且不再 animate、独立 transform 不支持时降级 opacity-only
-- [ ] 依赖：§2 冻结签名 + Agent A 的 `client.js` 文件名（集成时合并，写码时不读对方文件内容）
-- **完成判据**：`node --test test/` 全绿（jsdom 作为 devDependency 加入 package.json，选当前稳定版并锁定；测试经 fake loader 材料化取 `exports`，不依赖 ESM 具名导出）
+- [x] jsdom 环境装配：`window.__ModuleLoader__` fake（`load: (rec) => { captured = rec }`）、`document.documentElement` 注入 `--ds-transition-duration*` 变量（`style.setProperty`）、`Element.prototype.animate` fake（记录调用并返回可 settle 的假 animation）；单测先注入该 fake，再动态 import `client.js`，从 `captured.factory(...)` 的返回值取 `exports` 断言（不直接取具名导出）
+- [x] policy 测试：token 解析与 clamp、非法缓动回退、reduced-motion 下 `timing()` 全零、live 切换触发 subscribe
+- [x] classifier 测试：`role=menu` 插入产生 mount intent；dialog+mask 成对；`classifyRemoval` 定位 dialog/mask/menu；排除区（`data-dsh-transition="off"`、`[role="tooltip"]`）不产出
+- [x] runtime 测试：同帧去重（同一元素同 kind 只 animate 一次）、退场幽灵 `aria-hidden`/`inert`/`pointer-events:none` 且在 settle 后移除、`dispose()` 后观察器断开且不再 animate、独立 transform 不支持时降级 opacity-only
+- [x] 依赖：§2 冻结签名 + Agent A 的 `client.js` 文件名（集成时合并，写码时不读对方文件内容）
+- **完成判据**：`node --test` 全绿（Node v24.19 不接受 positional 目录参数，`node --test` 自动发现 `test/*.test.mjs`；jsdom 作为 devDependency 加入 package.json，选当前稳定版并锁定；测试经 fake loader 材料化取 `exports`，不依赖 ESM 具名导出）
 
 #### 3.2.3 Agent C：文档与说明
 
-- [ ] `README.md`：调研结论摘要、安装（`plugin_manager install_bundle` 路径 / 发布后 `dsh plugin add @tak1208/dsh-webui-transition`）、效果范围（菜单 + 设置面板）、退出开关 `data-dsh-transition="off"`、reduced-motion 行为、与 dsh-reduce-effects / dsh-theme-studio 共存说明、已知边界（不覆盖宿主已有动画）
-- [ ] `README.en.md`：英文镜像
-- [ ] 核对 `README` 与 §1「不做的事」一致，不夸大覆盖面
+- [x] `README.md`：调研结论摘要、安装（`plugin_manager install_bundle` 路径 / 发布后 `dsh plugin add @tak1208/dsh-webui-transition`）、效果范围（菜单 + 设置面板）、退出开关 `data-dsh-transition="off"`、reduced-motion 行为、与 dsh-reduce-effects / dsh-theme-studio 共存说明、已知边界（不覆盖宿主已有动画）
+- [x] `README.en.md`：英文镜像
+- [x] 核对 `README` 与 §1「不做的事」一致，不夸大覆盖面
 - **完成判据**：两份 README 齐备、链接有效（相对路径）、`LICENSE` 作者行与 package.json author 一致
 
 ### 3.3 集成、测试与首个提交
 
 #### 3.3.1 三路收敛
 
-- [ ] 合并 3.2 三个 Agent 的产物；按 §2 签名核对 fake loader 取出的 `exports` 与测试引用一致
-- [ ] 修复集成差异（先改 plan 再改代码，若有）
-- [ ] `node --check client.js && node --check index.js && node --test` 全绿
+- [x] 合并 3.2 三个 Agent 的产物；按 §2 签名核对 fake loader 取出的 `exports` 与测试引用一致
+- [x] 修复集成差异（先改 plan 再改代码，若有）
+- [x] `node --check client.js && node --check index.js && node --test` 全绿
 - **完成判据**：全部命令通过；`git commit -m "feat(webui-transition): 实现菜单与设置面板开合动画运行时（.plan/webui-transition.md §3.2–3.3）"`
 
 ### 3.4 安装到 web profile 并实机验证
