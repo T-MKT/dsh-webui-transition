@@ -73,6 +73,7 @@ When the system "Reduce motion" setting is on (`prefers-reduced-motion: reduce`)
 - Does not modify dsh source code and does not hand-write `package.json` / `cordis.patch.yml` into a profile.
 - Baseline is dsh `0.2.2-alpha.2`; after a dsh upgrade (especially 0.3.0 and later) the semantic selectors and client contract need re-checking.
 - Coverage depends on the host's semantic DOM (`role="menu"`, `role="dialog"` + `[data-shortcut-modal="settings"]`); changes to that structure affect coverage.
+- A glass surface's `backdrop-filter` (such as the menu's `.material` layer) pauses backdrop sampling while the open/close animation runs (about 120–220ms, a CSS backdrop-root constraint) and resumes immediately afterwards; the plugin leaves no animation state behind that affects host rendering.
 
 ## Development
 

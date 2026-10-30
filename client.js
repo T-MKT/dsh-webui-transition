@@ -862,8 +862,15 @@ window.__ModuleLoader__.load({
         );
         if (!animation) return;
         ownedAnimations.add(animation);
+        let released = false;
         whenSettled(animation, () => {
+          if (released) return;
+          released = true;
           ownedAnimations.delete(animation);
+          // 必须释放填充态：fill:"both" 的动画结束后仍持续生效，会让带 opacity
+          // 动画的元素长期充当 backdrop-root，其内部 backdrop-filter 层（DSH 菜单
+          // 的 .material）便无法采样页面背景 → 菜单永久半透明、模糊失效。
+          cancelAnimation(animation);
         });
       }
 

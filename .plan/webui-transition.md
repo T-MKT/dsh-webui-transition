@@ -84,6 +84,8 @@ compatibility.canAnimate（排除区 / 不可见 / 宿主已有动画 / data-dsh
 policy.timing(kind)（读 --ds-transition-* token + clamp + reduced-motion 归零）
   ▼
 WAAPI element.animate(keyframesFor(kind, timing, independent), { duration, easing, fill:"both" })
+  · 入场 settle 后 cancel() 释放填充态：fill:"both" 若长期生效，会让带 opacity 动画的表面持续充当
+    backdrop-root，其内部玻璃层（菜单 .material 的 backdrop-filter）将永久无法采样页面背景
   · 退场：classifyRemoval 定位被删的 dialog(+mask)/menu → cloneNode(true) 幽灵 → prepareGhost
     （aria-hidden + inert + pointer-events:none + 剥 id/aria-* 引用 + tabindex=-1 + backdrop-filter:none）
     → 插回原位置播 exitKeyframesFor → 全部 settle 后移除幽灵
@@ -207,6 +209,10 @@ function exitKeyframesFor(kind, timing, independentTransforms)   // → Keyframe
 - [ ] 验证 reduced-motion（系统开启「减少动态效果」）下无动画、无残留幽灵节点
 - [ ] 控制台无插件报错（无 slot entry crash、无未捕获异常）
 - [ ] 发现缺陷即在本插件内修复（不扩大范围）；修复后重新安装验证
+- [x] 缺陷修复（2026-10-30，实机检查发现）：入场动画 `fill:"both"` 结束后未释放填充态，`[role="menu"]`（`[data-menu-material]` 表面，即 `.material` 的父级）长期充当 backdrop-root，导致全部 `.material` 的 `--dsw-menu-backdrop-filter` 失效（菜单半透明、模糊消失）。
+  - 修复：`applyEntry` 入场动画 settle 时 `cancel()` 释放填充态（对齐 dsh-motion 的 settle 语义）；新增单测「入场动画 settle 后释放填充态，不残留 fill:both 动画」。
+  - 验证：无头 Chromium + CDP 连 127.0.0.1:3080 的 0.2.2-alpha.2 GUI —— 修复前菜单区域高清条纹清晰可见（无模糊、红色/蓝色像素各 ~48%），修复后完全模糊（红/蓝 0%）；菜单入场动画正常播放后释放、退场幽灵正常出现并移除、设置面板 mask+panel 动画正常释放，console 无插件异常。
+  - 已知边界：受 CSS backdrop-root 约束，带 opacity 的入场动画进行中（约 120–160ms）玻璃层无法采样背景，动画结束后立即恢复；插件不在动画结束后残留任何影响宿主渲染的动画态。
 - **完成判据**：用户确认两处动画符合预期；console 干净；卸载（`remove_bundle` 或停用）后界面还原为官方行为
 
 ### 3.5 收尾

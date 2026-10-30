@@ -73,6 +73,7 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 - 不修改 dsh 源码，不往 profile 手写 `package.json` / `cordis.patch.yml`。
 - 版本基线为 dsh `0.2.2-alpha.2`；dsh 升级（尤其 0.3.0 及以上）后需重新检查语义选择器与客户端契约。
 - 覆盖范围依赖宿主语义 DOM（`role="menu"`、`role="dialog"` + `[data-shortcut-modal="settings"]`）；宿主改动语义结构会影响覆盖面。
+- 玻璃表面的 `backdrop-filter`（如菜单的 `.material` 层）在开合动画进行中（约 120–220ms）会暂时停止采样背景（CSS backdrop-root 约束），动画结束后立即恢复；插件不会在动画结束后残留影响宿主渲染的动画态。
 
 ## 开发
 

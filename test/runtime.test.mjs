@@ -159,8 +159,9 @@ function createFakeAnimation(element, keyframes, options) {
       animation.onfinish({ type: "finish", target: animation });
     }
   };
+  // 与 WAAPI 一致：finished 状态下也可 cancel（实现会在 settle 后释放填充态）。
   animation.cancel = () => {
-    if (animation.playState !== "running") return;
+    if (animation.playState === "idle") return;
     animation.playState = "idle";
     animation.cancelled = true;
     resolveFinished(animation);
@@ -854,6 +855,29 @@ describe("region runtime：观察、去重、退场幽灵、清理", () => {
     );
     assert.equal(call.options.fill, "both", "填充模式应为 both");
     assert.equal(Number(call.keyframes[0].opacity), 0, "入场从透明开始");
+  });
+
+  clientTest("入场动画 settle 后释放填充态，不残留 fill:both 动画", async (t, api) => {
+    const harness = createHarness({ clientApi: api });
+    const menu = buildMenu();
+    document.body.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const animation = fakeAnimations.find((item) => item.element === menu);
+    assert.ok(animation, "菜单应播放入场动画");
+    assert.equal(animation.options.fill, "both", "动画期间依赖 fill:both 维持首尾帧");
+    assert.equal(menu.getAnimations().length, 1, "动画进行中应可观测到填充态动画");
+
+    await settleAnimations();
+
+    assert.equal(animation.playState, "idle", "settle 后动画应回到 idle");
+    assert.equal(animation.cancelled, true, "settle 后应 cancel 释放填充态");
+    assert.deepEqual(
+      menu.getAnimations(),
+      [],
+      "不残留 fill:both 动画：否则元素长期充当 backdrop-root，子级 backdrop-filter 失效",
+    );
   });
 
   clientTest("同帧内同元素同 kind 去重，只 animate 一次", (t, api) => {
