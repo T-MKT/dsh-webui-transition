@@ -20,11 +20,11 @@
 - 没有找到可直接安装、恰好满足需求的现成插件。
 - 运行时架构借鉴 `bilbillm/dsh-motion`（语义分类 + `MutationObserver` + WAAPI + 成对退场幽灵，MIT）。
 - 动效参数取自 `dsh-motion-complete` 已定稿的数值。
-- 本仓库为手写的四文件形态（`package.json` / `cordis.patch.yml` / `index.js` / `client.js`），无构建工具、无第三方运行时依赖。
+- 本仓库源码为 `src/` 下的 ESM 模块，按职责拆分；入口 `src/browser.js` 经 esbuild 打包为 dsh 客户端契约要求的 classic `client.js`。运行时无第三方依赖（esbuild 仅为开发期构建工具）。
 
 ## 安装
 
-本仓库形态为 dsh bundle：`package.json` 声明 `dsh.bundle.patch`（Loader 插入一行插件）与 `dsh.client`（浏览器半区，classic script）。兼容 dsh `0.2.2-alpha.2`（`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`）。
+本仓库形态为 dsh bundle：`package.json` 声明 `dsh.bundle.patch`（Loader 插入一行插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。兼容 dsh `0.2.2-alpha.2`（`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`）。
 
 **开发期（本仓库未发布时）**：用 dsh 的 `plugin_manager` 工具安装，`target` 取本仓库绝对路径：
 
@@ -57,7 +57,7 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 
 ## 减少动态效果
 
-系统开启「减少动态效果」（`prefers-reduced-motion: reduce`）时，不播放任何动画、不生成幽灵节点；运行中切换系统设置也会实时生效（动画时长归零）。
+系统开启「减少动态效果」（`prefers-reduced-motion: reduce`）时，不播放任何动画、不生成幽灵节点。运行中开启会立即取消正在播放的动画并清除退场幽灵；此后新动画自动保持不播，关闭该设置后新动画恢复播放。
 
 ## 与其它动效插件共存
 
@@ -70,22 +70,26 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 - 只做两处表面：各级下拉菜单与设置面板。不做消息入场/流式渲染/平滑滚动，不做设置面板内 tab 切换、开关与指示条，不做菜单翻页。
 - 不注册 slot、不渲染组件；纯观察 + WAAPI。
 - 不修改宿主卸载时序（退场全部走幽灵副本，不使用延迟卸载补丁）。
-- 不修改 dsh 源码，不往 profile 手写 `package.json` / `cordis.patch.yml`。
+- 不修改 dsh 源码，不往 profile 写入 `package.json` / `cordis.patch.yml`。
 - 版本基线为 dsh `0.2.2-alpha.2`；dsh 升级（尤其 0.3.0 及以上）后需重新检查语义选择器与客户端契约。
 - 覆盖范围依赖宿主语义 DOM（`role="menu"`、`role="dialog"` + `[data-shortcut-modal="settings"]`）；宿主改动语义结构会影响覆盖面。
 - 玻璃表面的 `backdrop-filter`（如菜单的 `.material` 层）在过渡期间保持模糊：菜单的淡入淡出下沉到直接子级、退场幽灵不再剥离 `backdrop-filter`，因此入场/退场动画全程都在采样页面背景。
 - 菜单容器的 `box-shadow`（宿主 elevation 阴影）随动画同步淡入/淡出，不会先出现「只有阴影的轮廓」，也不会在内容淡完后残留阴影。
 - 菜单的直接子元素若自带宿主 CSS animation，插件会短暂覆盖其 `opacity`（动画结束即释放填充态）；只影响宿主在子元素上已有 `opacity` 动画的极端情况。
 
-## 开发
+## 实现架构与开发
+
+源码是 `src/` 下的 ESM 模块，一个文件一个职责：`defs.js`（常量与 `SURFACE_DEFS` 表面描述符）、`utils.js`（通用小工具）、`policy.js`（token / reduced-motion / 时长策略）、`tracker.js`（表面状态机与 DOM 分类）、`gate.js`（WAAPI / CSS animation / CSS transition 冲突门卫）、`frames.js`（纯关键帧函数）、`runtime.js`（观察、批量、入场与退场幽灵）、`browser.js`（浏览器入口，注册到 `window.__ModuleLoader__`）。入口经 esbuild 打包为根目录的 classic iife 产物 `client.js`：顶层只有 `window.__ModuleLoader__.load({ id, factory })`，不出现 `import`/`export`；运行时工厂定义在 factory 闭包内并经 `exports.*` 暴露冻结签名。
+
+`client.js` 是构建产物，由 `pnpm build` 生成，**不要手改**；改实现请改 `src/` 后重新构建。
 
 ```bash
-pnpm install --ignore-scripts
-node --check client.js
-node --test
+pnpm install
+pnpm build   # src/browser.js → client.js（classic iife）
+pnpm test    # pretest 先构建，再跑 node --test
 ```
 
-`client.js` 是 classic script：文件顶层只有 `window.__ModuleLoader__.load({ id, factory })`，不出现 `import`/`export`；运行时工厂定义在 factory 闭包内并经 `exports.*` 暴露。单测先注入 fake `window.__ModuleLoader__` 再动态导入该文件，从捕获的 factory 取 `exports` 断言。
+测试用 Node 内置 `node --test` + `jsdom`：`test/helpers/env.mjs` 负责 jsdom 装配、fake `__ModuleLoader__` 与 fake `animate` 等，每个 `src/` 模块对应一个测试文件，另有 `bundle.test.mjs` 对构建产物做 classic 契约冒烟。
 
 ## 许可
 

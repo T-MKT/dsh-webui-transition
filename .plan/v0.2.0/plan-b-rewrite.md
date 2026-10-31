@@ -286,17 +286,30 @@ node --test
 
 ## 7 分阶段执行计划
 
-| 阶段 | 内容 | 验收标准 |
-| --- | --- | --- |
-| **P0** | 从当前 HEAD 新建分支 `feat/v0.2.0` | `git branch --show-current` 命中 |
-| **P1** | 写入 `.plan/v0.2.0/plan-b-rewrite.md`，更新 AGENTS.md 项目地图，旧计划加历史标记 | `grep -n "v0.2.0" AGENTS.md` 命中；旧计划有历史标记 |
-| **P2** | 安装 esbuild；新增 `pnpm-workspace.yaml`；更新 package.json scripts/version | `pnpm install` 退出码 0；`pnpm exec esbuild --version` 可用 |
-| **P3** | 编写 `src/` 八个 ESM 模块与 `scripts/build.mjs` | `node --check` 通过；构建产物无 `import`/`export` |
-| **P4** | 编写 `test/` 六个测试文件与共享 helper | `node --test` 全绿 |
-| **P5** | 更新 README/README.en/AGENTS，回填本计划进度 | `grep` 旧架构词在 README/plan 中无残留 |
-| **P6** | 安装到 web profile：`plugin_manager remove_bundle` → `install_bundle`；`cordis_inspect_query` 确认挂载 | `application: applied`；插件出现在设置 → 内置插件 |
-| **P7** | 实机验证：设置面板开合、各处菜单开合、reduced-motion 热切换、玻璃模糊、阴影淡入淡出、console 干净、卸载还原 | 用户确认；无未捕获异常 |
-| **P8** | 回填计划进度，提交；是否发布 npm 由用户决定 | 工作区干净；提交信息指向 `.plan/v0.2.0/plan-b-rewrite.md`；不 push（除非批准） |
+| 阶段 | 内容 | 验收标准 | 状态 |
+| --- | --- | --- | --- |
+| **P0** | 从当前 HEAD 新建分支 `feat/v0.2.0` | `git branch --show-current` 命中 | ✅ 完成 |
+| **P1** | 写入 `.plan/v0.2.0/plan-b-rewrite.md`，更新 AGENTS.md 项目地图，旧计划加历史标记 | `grep -n "v0.2.0" AGENTS.md` 命中；旧计划有历史标记 | ✅ 完成 |
+| **P2** | 安装 esbuild；新增 `pnpm-workspace.yaml`；更新 package.json scripts/version | `pnpm install` 退出码 0；`pnpm exec esbuild --version` 可用 | ✅ 完成 |
+| **P3** | 编写 `src/` 八个 ESM 模块与 `scripts/build.mjs` | `node --check` 通过；构建产物无 `import`/`export` | ✅ 完成 |
+| **P4** | 编写 `test/` 六个测试文件与共享 helper | `node --test` 全绿 | ✅ 完成（81 tests / 81 pass / 0 fail） |
+| **P5** | 更新 README/README.en/AGENTS，回填本计划进度 | `grep` 旧架构词在 README/plan 中无残留 | ✅ 完成 |
+| **P6** | 安装到 web profile：`plugin_manager remove_bundle` → `install_bundle`；`cordis_inspect_query` 确认挂载 | `application: applied`；插件出现在设置 → 内置插件 | ✅ 完成（`application: applied`，`include:dsh-webui-transition` 在 live config 中） |
+| **P7** | 实机验证：设置面板开合、各处菜单开合、reduced-motion 热切换、玻璃模糊、阴影淡入淡出、console 干净、卸载还原 | 用户确认；无未捕获异常 | ✅ 完成（用户确认通过） |
+| **P8** | 回填计划进度，提交；是否发布 npm 由用户决定 | 工作区干净；提交信息指向 `.plan/v0.2.0/plan-b-rewrite.md`；不 push（除非批准） | ✅ 完成（已提交，不 push；npm 发布待用户决定） |
+
+### 7.1 执行记录（回填）
+
+- 编码方式：Lead 负责 `defs` / `utils` / `policy` / `browser` / `build` / 测试装配与集成；
+  `tracker` / `gate` / `frames` / `runtime` 四个模块由并行 subagent 按 §3.4–§3.7 与冻结签名实现并各自配套单测。
+- 每条实现均按 §1.3 行为契约从 v0.1.0 单文件 `client.js` 拆分，未引入第三方运行时依赖。
+- 验收命令结果：`node --check src/*.js scripts/build.mjs` 通过；`node scripts/build.mjs` 通过；
+  `node --test` → 81 tests / 81 pass / 0 fail（policy 12、tracker 21、gate 20、frames 14、runtime 8、bundle 5，另含套件计数）。
+- P6 安装：profile 原已以 `link:` 方式依赖本仓库，`remove_bundle` → `install_bundle` 后返回
+  `application: applied`、`version: 0.2.0`、无 warnings；`cordis_inspect_query` 可查到 `include:dsh-webui-transition`。
+- P7 实机验证：用户强刷页面后确认设置 → 内置插件可见、设置面板与菜单开合动画正常、玻璃模糊与阴影淡入淡出正常、
+  运行中切换「减少动态效果」立即取消在播动画并清除幽灵、console 无未捕获异常。
+- P8 提交：本次提交即 P8 产物（提交信息指向本文档），按用户要求不 push；是否发布 npm 由用户决定。
 
 ## 8 风险与回滚
 
