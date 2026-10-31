@@ -6,7 +6,7 @@
  * 不再出现 `kind === "menu" || kind === "listbox"` 这类硬编码分支
  * （.plan/v0.2.0/plan-b-rewrite.md §3.6，冻结签名见 §4）。
  *
- * v0.2.1 追加「伪元素玻璃」模式（.plan/v0.2.1/pseudo-glass-blur.md）：
+ * v0.2.0 追加「伪元素玻璃」模式（.plan/v0.2.0/pseudo-glass-blur.md）：
  * 表面自身无 backdrop-filter、但 ::before/::after 带 backdrop-filter 时，表面不能做
  * opacity 动画（会成为 backdrop-root，使伪元素无法采样页面背景）；改为表面几何/阴影 +
  * 直接子级 opacity + 伪元素自身 opacity（后者由 runtime 用 WAAPI pseudoElement 播放）。
@@ -175,7 +175,7 @@ export function exitKeyframesFor(kind, timing, independentTransforms, boxShadow 
   return [first, last];
 }
 
-// 把一个表面拆成若干条 WAAPI 动画规格（§3.6 + v0.2.1 伪元素玻璃）：
+// 把一个表面拆成若干条 WAAPI 动画规格（§3.6 + v0.2.0 伪元素玻璃）：
 // - splitFade 表面：表面几何/阴影一条（若表面帧非空）+ 每个直接元素子级一条
 //   opacity（0 ↔ 自然值）；无直接元素子级时回退为「表面整体」（opacity 0↔1
 //   并入表面帧；无几何帧时单独 opacity 帧）。

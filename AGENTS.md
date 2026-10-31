@@ -24,10 +24,9 @@ dsh-webui-transition/
 │   │   ├── webui-transition.md
 │   │   ├── blur-during-transition.md
 │   │   └── compatible-with-0.2.2-alpha.2.md
-│   ├── v0.2.0/
-│   │   └── plan-b-rewrite.md            # v0.2.0 唯一开发真源
-│   └── v0.2.1/
-│       └── pseudo-glass-blur.md         # v0.2.1 伪元素玻璃模糊修复真源
+│   └── v0.2.0/
+│       ├── plan-b-rewrite.md            # v0.2.0 主体真源（ESM 重写计划）
+│       └── pseudo-glass-blur.md         # v0.2.0 伪元素玻璃模糊修复真源
 ├── src/                                 # ESM 源码（esbuild 入口：src/browser.js）
 │   ├── defs.js                          # 常量 + SURFACE_DEFS 表面描述符
 │   ├── utils.js                         # 通用小工具（CSS 解析 / 默认依赖 / 语义工具）

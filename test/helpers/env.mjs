@@ -19,7 +19,7 @@ import { OBSERVED_ATTRIBUTES } from "../../src/defs.js";
 // 1. jsdom 环境与全局注入
 // ---------------------------------------------------------------------------
 
-// jsdom 未实现带伪元素的 getComputedStyle（v0.2.1 伪元素玻璃检测会读取），
+// jsdom 未实现带伪元素的 getComputedStyle（v0.2.0 伪元素玻璃检测会读取），
 // 该告警不是失败，静音；其它 jsdomError 仍照常输出。
 const virtualConsole = new VirtualConsole();
 virtualConsole.on("jsdomError", (error) => {

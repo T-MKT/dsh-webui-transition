@@ -1,6 +1,6 @@
 # 伪元素玻璃层（::before/::after）在过渡期间保持模糊
 
-> 本文件是 v0.2.1 的唯一开发真源，承接 `.plan/v0.1.0/blur-during-transition.md` 的核心不变式。
+> 本文件是 v0.2.0 的唯一开发真源，承接 `.plan/v0.1.0/blur-during-transition.md` 的核心不变式。
 
 ## 1 问题与事实
 
@@ -63,7 +63,7 @@
 | `test/frames.test.mjs` | 伪元素玻璃模式规格（表面无 opacity、子级 + 伪元素淡入淡出、阴影、`::after`、自然 opacity、无子级、降级） |
 | `test/runtime.test.mjs` | 伪元素规格接线、不支持时取消、退场幽灵伪元素动画 |
 | `README.md` / `README.en.md` | 已知边界补伪元素玻璃与降级说明 |
-| `AGENTS.md` | `.plan/v0.2.1/` 项目地图 |
+| `AGENTS.md` | `.plan/v0.2.0/` 项目地图 |
 | `client.js` | `pnpm build` 产物（不手改） |
 
 **冻结签名变化**（相对 `.plan/v0.2.0/plan-b-rewrite.md` §4）：
@@ -122,15 +122,15 @@ defaultAnimator(element, keyframes, timing, pseudoElement?)  // 内部依赖，�
 
 端到端 harness（同 headless Chrome，加载真实构建产物 `client.js`，慢放 ×10；`ver=new|old` 对比）：
 
-| 版本 | 场景 | 宿主 opacity | ::before opacity | 面板内 std | 判读 |
+| 构建 | 场景 | 宿主 opacity | ::before opacity | 面板内 std | 判读 |
 | --- | --- | --- | --- | --- | --- |
-| v0.2.1 | 入场（内容 opacity 50% 采样点） | 1 | 0.5 | 0.1785 | ≈静态半透明玻璃标定 0.1803（Δ0.0018），模糊有效 |
-| v0.2.1 | 入场 settle | 1 | 1 | 0.0058 | =全模糊标定；`panel.getAnimations()=0`、`document.getAnimations()=0` |
-| v0.2.1 | 退场幽灵（50% 采样点） | 1 | 0.5 | 0.1774 | ≈静态半透明玻璃（Δ0.0029），幽灵内模糊有效；settle 后幽灵移除 |
-| v0.2.0 | 入场（内容 opacity 50% 采样点） | 0.5 | 1 | 0.3595 | ≈无模糊标定 0.3628 → 复现用户报告：动画期间无模糊 |
-| v0.2.0 | 退场幽灵（50% 采样点） | 0.5 | 1 | 0.3595 | 幽灵内无模糊 |
+| 修复后（v0.2.0） | 入场（内容 opacity 50% 采样点） | 1 | 0.5 | 0.1785 | ≈静态半透明玻璃标定 0.1803（Δ0.0018），模糊有效 |
+| 修复后（v0.2.0） | 入场 settle | 1 | 1 | 0.0058 | =全模糊标定；`panel.getAnimations()=0`、`document.getAnimations()=0` |
+| 修复后（v0.2.0） | 退场幽灵（50% 采样点） | 1 | 0.5 | 0.1774 | ≈静态半透明玻璃（Δ0.0029），幽灵内模糊有效；settle 后幽灵移除 |
+| 修复前（v0.2.0 旧构建） | 入场（内容 opacity 50% 采样点） | 0.5 | 1 | 0.3595 | ≈无模糊标定 0.3628 → 复现用户报告：动画期间无模糊 |
+| 修复前（v0.2.0 旧构建） | 退场幽灵（50% 采样点） | 0.5 | 1 | 0.3595 | 幽灵内无模糊 |
 
-`__animateLog` 证据（v0.2.1）：伪元素规格 `pseudoElement:"::before"` 且 `effect.pseudoElement` 回读一致、
+`__animateLog` 证据（修复后）：伪元素规格 `pseudoElement:"::before"` 且 `effect.pseudoElement` 回读一致、
 keyframes `[{opacity:0},{opacity:1}]`（退场 `[{opacity:1},{opacity:0}]`）；面板几何规格
 `[{translate:"0 12px",boxShadow:"none"},{translate:"0 0",boxShadow:<计算值>}]`（无 opacity）；2 个直接子级各一条
-opacity。v0.2.0 只有一条宿主 opacity+translate 规格，无伪元素动画。两版本 settle 后无残留动画/幽灵，无 console 错误。
+opacity。修复前只有一条宿主 opacity+translate 规格，无伪元素动画。两版本 settle 后无残留动画/幽灵，无 console 错误。
