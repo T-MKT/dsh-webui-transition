@@ -11,7 +11,7 @@
  * 所有依赖环境的能力都通过参数注入被测模块，helper 只负责装配。
  */
 
-import { JSDOM } from "jsdom";
+import { JSDOM, VirtualConsole } from "jsdom";
 
 import { OBSERVED_ATTRIBUTES } from "../../src/defs.js";
 
@@ -19,9 +19,19 @@ import { OBSERVED_ATTRIBUTES } from "../../src/defs.js";
 // 1. jsdom 环境与全局注入
 // ---------------------------------------------------------------------------
 
+// jsdom 未实现带伪元素的 getComputedStyle（v0.2.1 伪元素玻璃检测会读取），
+// 该告警不是失败，静音；其它 jsdomError 仍照常输出。
+const virtualConsole = new VirtualConsole();
+virtualConsole.on("jsdomError", (error) => {
+  const message = String((error && error.message) || "");
+  if (message.includes("getComputedStyle") && message.includes("pseudo-elements")) return;
+  console.error(error);
+});
+
 export const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://127.0.0.1:3080/",
   pretendToBeVisual: true,
+  virtualConsole,
 });
 
 export const window = dom.window;
@@ -107,11 +117,14 @@ function createFakeAnimation(element, keyframes, options) {
   const finished = new Promise((resolve) => {
     resolveFinished = resolve;
   });
+  const pseudoElement = options && options.pseudoElement ? options.pseudoElement : null;
   const animation = {
     id: ++animationSequence,
     element,
     keyframes,
     options,
+    // 模拟 KeyframeEffect：runtime 用 effect.pseudoElement 判断伪元素动画是否真的落地。
+    effect: { target: element, pseudoElement },
     finished,
     playState: "running",
     cancelled: false,
@@ -308,6 +321,48 @@ export function buildSettingsOverlay() {
   panel.setAttribute("data-shortcut-modal", "settings");
   overlay.append(mask, panel);
   return { overlay, mask, panel };
+}
+
+/**
+ * 伪元素玻璃表面：role="dialog" 的弹出面板，玻璃层在 ::before 上
+ * （对应宿主 `.VoX2oq_panel` / `._7yHdaG_panel` 的结构）。
+ * jsdom 不支持伪元素样式，规格测试用 `pseudoGlassComputedStyle()` 注入。
+ */
+export function buildGlassPanel() {
+  const panel = document.createElement("div");
+  panel.className = "glass-panel";
+  panel.setAttribute("role", "dialog");
+  const header = document.createElement("div");
+  header.className = "glass-header";
+  const body = document.createElement("div");
+  body.className = "glass-body";
+  body.textContent = "content";
+  panel.append(header, body);
+  return panel;
+}
+
+/**
+ * 伪元素玻璃的 computedStyle 桩：元素本身回退真实 jsdom 计算样式；
+ * 伪元素返回固定的 content/backdrop-filter/opacity。
+ *
+ * @param {{ pseudo?: string, opacity?: string, backdropFilter?: string }} [options]
+ * @returns {(element: Element, pseudoElement?: string | null) => object}
+ */
+export function pseudoGlassComputedStyle(options = {}) {
+  const pseudo = options.pseudo || "::before";
+  const opacity = options.opacity === undefined ? "1" : options.opacity;
+  const backdropFilter = options.backdropFilter || "blur(40px) saturate(1.5)";
+  return (element, pseudoElement) => {
+    if (!pseudoElement) return computedStyle(element);
+    const isGlass = pseudoElement === pseudo;
+    return {
+      content: isGlass ? '""' : "none",
+      backdropFilter: isGlass ? backdropFilter : "none",
+      opacity,
+      boxShadow: "none",
+      getPropertyValue: () => "",
+    };
+  };
 }
 
 /** 在 document.body 上抓取一次 DOM 操作产生的 MutationRecord 列表。 */

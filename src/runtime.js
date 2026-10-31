@@ -24,17 +24,27 @@ import {
 // 默认依赖：动画器 / 帧调度
 // ===========================================================================
 
-function defaultAnimator(element, keyframes, timing) {
+function defaultAnimator(element, keyframes, timing, pseudoElement) {
   if (!isElement(element) || typeof element.animate !== "function") return null;
+  const options = {
+    duration: timing.durationMs,
+    easing: timing.easing,
+    fill: "both",
+  };
+  if (pseudoElement) options.pseudoElement = pseudoElement;
   try {
-    return element.animate(keyframes, {
-      duration: timing.durationMs,
-      easing: timing.easing,
-      fill: "both",
-    });
+    return element.animate(keyframes, options);
   } catch (error) {
     return null;
   }
+}
+
+// 伪元素动画校验：不支持 pseudoElement 的浏览器会静默忽略该选项、把动画落到宿主元素上，
+// 宿主的 opacity 动画会重新成为 backdrop-root（模糊失效），因此必须识别并取消。
+function animationTargetsPseudo(animation, pseudoElement) {
+  if (!pseudoElement) return true;
+  const effect = animation && animation.effect;
+  return !!effect && effect.pseudoElement === pseudoElement;
 }
 
 function defaultRequestFrame(callback) {
@@ -175,6 +185,14 @@ export function createTransitionRuntime(options = {}) {
   const requestFrame =
     typeof options.requestFrame === "function" ? options.requestFrame : defaultRequestFrame;
   const cancelFrame = typeof options.cancelFrame === "function" ? options.cancelFrame : defaultCancelFrame;
+  // 伪元素玻璃检测依赖 computed style：显式传入时转发给 frames，默认由 frames 自行读取。
+  const specOptions =
+    typeof options.computedStyle === "function" ? { computedStyle: options.computedStyle } : {};
+
+  // 规格只依赖「表面 + kind + 方向」，入场与退场幽灵共用同一套拆分规则。
+  function specsFor(element, kind, direction) {
+    return animationSpecsFor(element, kind, direction, supportsIndependentTransforms(), specOptions);
+  }
 
   // lastApplied：element -> kind -> "trigger:state"；只在动画真正创建后写入（§3.7 去重修正）。
   let lastApplied = new WeakMap();
@@ -294,11 +312,16 @@ export function createTransitionRuntime(options = {}) {
     const timing = timingFor(intent.kind);
     if (!timing || !(timing.durationMs > 0)) return;
 
-    const specs = animationSpecsFor(element, intent.kind, "in", supportsIndependentTransforms());
+    const specs = specsFor(element, intent.kind, "in");
     let created = 0;
     for (const spec of specs) {
-      const animation = animator(spec.element, spec.keyframes, timing);
+      const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);
       if (!animation) continue;
+      if (!animationTargetsPseudo(animation, spec.pseudoElement)) {
+        // 浏览器忽略 pseudoElement：动画落到了宿主上，立即取消，避免重新引入 backdrop-root。
+        cancelAnimation(animation);
+        continue;
+      }
       created += 1;
       ownedAnimations.add(animation);
       let released = false;
@@ -353,10 +376,15 @@ export function createTransitionRuntime(options = {}) {
       if (!isElement(target)) continue;
       const timing = timingFor(surface.kind);
       if (!timing || !(timing.durationMs > 0)) continue;
-      const specs = animationSpecsFor(target, surface.kind, "out", supportsIndependentTransforms());
+      const specs = specsFor(target, surface.kind, "out");
       for (const spec of specs) {
-        const animation = animator(spec.element, spec.keyframes, timing);
+        const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);
         if (!animation) continue;
+        if (!animationTargetsPseudo(animation, spec.pseudoElement)) {
+          // 同上：伪元素动画不可用时不能把退场动画留在幽灵宿主上。
+          cancelAnimation(animation);
+          continue;
+        }
         exitAnimations.add(animation);
         whenSettled(animation, () => {
           exitAnimations.delete(animation);

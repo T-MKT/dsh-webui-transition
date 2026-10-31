@@ -24,15 +24,17 @@ dsh-webui-transition/
 │   │   ├── webui-transition.md
 │   │   ├── blur-during-transition.md
 │   │   └── compatible-with-0.2.2-alpha.2.md
-│   └── v0.2.0/
-│       └── plan-b-rewrite.md            # v0.2.0 唯一开发真源
+│   ├── v0.2.0/
+│   │   └── plan-b-rewrite.md            # v0.2.0 唯一开发真源
+│   └── v0.2.1/
+│       └── pseudo-glass-blur.md         # v0.2.1 伪元素玻璃模糊修复真源
 ├── src/                                 # ESM 源码（esbuild 入口：src/browser.js）
 │   ├── defs.js                          # 常量 + SURFACE_DEFS 表面描述符
 │   ├── utils.js                         # 通用小工具（CSS 解析 / 默认依赖 / 语义工具）
 │   ├── policy.js                        # createPolicy：token / reduced-motion / 时长
 │   ├── tracker.js                       # createSurfaceTracker：表面状态机 + DOM 分类
 │   ├── gate.js                          # createGate：兼容性门卫（WAAPI / CSS animation / CSS transition）
-│   ├── frames.js                        # 纯帧函数：关键帧 + 动画规格拆分
+│   ├── frames.js                        # 纯帧函数：关键帧 + 动画规格拆分（含伪元素玻璃）
 │   ├── runtime.js                       # createTransitionRuntime：观察 / 批量 / 入场 / 幽灵 / 清理
 │   └── browser.js                       # 浏览器入口：__ModuleLoader__.load 注册
 ├── scripts/

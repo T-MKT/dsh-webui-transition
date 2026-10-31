@@ -66,18 +66,38 @@ export function parseEasing(value, fallback) {
   return fallback;
 }
 
-// 默认读取某个元素的 computed style（浏览器中即 window.getComputedStyle）。
-export function defaultComputedStyle(element) {
+// 默认读取某个元素（或伪元素，如 "::before"）的 computed style。
+export function defaultComputedStyle(element, pseudoElement = null) {
   if (!isElement(element)) return null;
+  const pseudo = pseudoElement || undefined;
   const document = element.ownerDocument;
   const view = document && document.defaultView;
-  if (view && typeof view.getComputedStyle === "function") return view.getComputedStyle(element);
+  if (view && typeof view.getComputedStyle === "function") {
+    return pseudo ? view.getComputedStyle(element, pseudo) : view.getComputedStyle(element);
+  }
   const scope = globalScope();
-  if (scope && typeof scope.getComputedStyle === "function") return scope.getComputedStyle(element);
+  if (scope && typeof scope.getComputedStyle === "function") {
+    return pseudo ? scope.getComputedStyle(element, pseudo) : scope.getComputedStyle(element);
+  }
   if (typeof window !== "undefined" && window && typeof window.getComputedStyle === "function") {
-    return window.getComputedStyle(element);
+    return pseudo ? window.getComputedStyle(element, pseudo) : window.getComputedStyle(element);
   }
   return null;
+}
+
+// 读取元素的 backdrop-filter 计算值（含 -webkit- 前缀）；none / 空 / 异常 → ""。
+export function readBackdropFilter(style) {
+  if (!style) return "";
+  let value = "";
+  try {
+    value = style.backdropFilter || style.webkitBackdropFilter || "";
+  } catch (error) {
+    value = "";
+  }
+  if (!value) value = readStyleProperty(style, "backdrop-filter");
+  if (!value) value = readStyleProperty(style, "-webkit-backdrop-filter");
+  const trimmed = String(value).trim();
+  return trimmed && trimmed.toLowerCase() !== "none" ? trimmed : "";
 }
 
 // 默认 matchMedia：优先 globalThis，其次 window；缺失返回 null。

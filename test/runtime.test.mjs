@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 
 import {
   animateCalls,
+  buildGlassPanel,
   buildMenu,
   computedStyle,
   createFrameScheduler,
@@ -23,6 +24,7 @@ import {
   fakeAnimations,
   flushAllFrames,
   nextTask,
+  pseudoGlassComputedStyle,
   resetAnimationLog,
   resetEnvironment,
   settleAnimations,
@@ -41,17 +43,20 @@ const activeHarnesses = [];
 /**
  * 装配一个 runtime：真实 policy / tracker / gate，注入可控帧调度器与 matchMedia 桩。
  */
-function createHarness() {
+function createHarness(overrides = {}) {
   const scheduler = createFrameScheduler();
   const media = createMatchMediaMock(false);
-  const policy = createPolicy({ matchMedia: media.matchMedia, computedStyle });
+  const style = typeof overrides.computedStyle === "function" ? overrides.computedStyle : computedStyle;
+  const policy = createPolicy({ matchMedia: media.matchMedia, computedStyle: style });
   const tracker = createSurfaceTracker();
-  const gate = createGate({ computedStyle });
+  const gate = createGate({ computedStyle: style });
   const runtime = createTransitionRuntime({
     root: document,
     policy,
     tracker,
     gate,
+    computedStyle: style,
+    animator: overrides.animator,
     requestFrame: scheduler.requestFrame,
     cancelFrame: scheduler.cancelFrame,
   });
@@ -411,5 +416,134 @@ describe("runtime：dispose", () => {
     await nextTask();
     flushAllFrames(harness.scheduler);
     assert.equal(animateCalls.length, callsBefore, "dispose 后 observer 已断开，不再产生动画");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v0.2.1 伪元素玻璃：表面不做 opacity，伪元素自身经 WAAPI pseudoElement 淡入淡出
+// ---------------------------------------------------------------------------
+
+const GLASS_SHADOW = "rgb(0, 0, 0) 0px 8px 24px";
+
+describe("runtime：伪元素玻璃", () => {
+  test("入场：表面几何 + 子级 opacity + 伪元素 pseudoElement 动画，表面无 opacity", async () => {
+    const harness = createHarness({ computedStyle: pseudoGlassComputedStyle() });
+    const panel = buildGlassPanel();
+    panel.style.boxShadow = GLASS_SHADOW;
+    document.body.appendChild(panel);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const panelCalls = animateCalls.filter((call) => call.element === panel);
+    assert.equal(panelCalls.length, 2, "表面几何一条 + 伪元素一条");
+
+    const geometryCall = panelCalls.find((call) => !call.options.pseudoElement);
+    assert.ok(geometryCall, "应有表面几何动画");
+    assert.equal(geometryCall.keyframes[0].translate, "0 12px");
+    assert.equal(geometryCall.keyframes[0].boxShadow, "none");
+    for (const frame of geometryCall.keyframes) {
+      assert.equal("opacity" in frame, false, "伪元素玻璃表面不得有 opacity 帧");
+    }
+
+    const pseudoCall = panelCalls.find((call) => call.options.pseudoElement === "::before");
+    assert.ok(pseudoCall, "伪元素动画应带 pseudoElement 选项");
+    assert.deepEqual(pseudoCall.keyframes, [{ opacity: 0 }, { opacity: 1 }]);
+    assert.equal(
+      pseudoCall.options.duration,
+      harness.policy.timing("dialog").durationMs,
+      "伪元素与表面共用 timing",
+    );
+
+    const children = Array.from(panel.children);
+    const childCalls = animateCalls.filter((call) => children.includes(call.element));
+    assert.equal(childCalls.length, children.length, "每个直接元素子级各一条 opacity 动画");
+    for (const call of childCalls) {
+      assert.deepEqual(call.keyframes, [{ opacity: 0 }, { opacity: 1 }]);
+    }
+  });
+
+  test("伪元素动画不可用（浏览器忽略 pseudoElement）：落到宿主的动画被立即取消", async () => {
+    // 模拟旧浏览器：pseudoElement 选项被忽略，动画落到宿主元素上（effect.pseudoElement 为空）。
+    const ignoringAnimator = (element, keyframes, timing, pseudoElement) => {
+      const animation = element.animate(keyframes, {
+        duration: timing.durationMs,
+        easing: timing.easing,
+        fill: "both",
+      });
+      if (pseudoElement) animation.effect = { target: element, pseudoElement: null };
+      return animation;
+    };
+    const harness = createHarness({
+      computedStyle: pseudoGlassComputedStyle(),
+      animator: ignoringAnimator,
+    });
+    const panel = buildGlassPanel();
+    panel.style.boxShadow = GLASS_SHADOW;
+    document.body.appendChild(panel);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const dropped = fakeAnimations.filter(
+      (animation) =>
+        animation.element === panel &&
+        animation.cancelled &&
+        animation.keyframes.some((frame) => "opacity" in frame),
+    );
+    assert.equal(dropped.length, 1, "伪元素动画落到宿主后应被取消一次");
+    assert.equal(dropped[0].playState, "idle", "取消后不得留存宿主 opacity 动画");
+
+    // 表面几何与子级动画仍在（模糊保障优先于玻璃淡入）。
+    const running = fakeAnimations.filter(
+      (animation) => animation.element === panel && animation.playState === "running",
+    );
+    assert.equal(running.length, 1, "仅表面几何动画仍在运行");
+    for (const frame of running[0].keyframes) {
+      assert.equal("opacity" in frame, false);
+    }
+  });
+
+  test("退场幽灵：克隆体的伪元素同样淡出，settle 后移除幽灵", async () => {
+    const harness = createHarness({ computedStyle: pseudoGlassComputedStyle() });
+    const stage = document.createElement("div");
+    document.body.appendChild(stage);
+    const panel = buildGlassPanel();
+    panel.style.boxShadow = GLASS_SHADOW;
+    stage.appendChild(panel);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+    await settleAnimations(); // 结清入场
+    resetAnimationLog();
+
+    panel.remove();
+    await nextTask();
+
+    const ghost = document.querySelector("[data-dsh-transition-ghost]");
+    assert.ok(ghost, "退场应插入幽灵副本");
+    assert.equal(ghost.parentElement, stage, "幽灵插回原位置");
+
+    const ghostCalls = animateCalls.filter(
+      (call) => call.element === ghost || (ghost.contains && ghost.contains(call.element)),
+    );
+    const pseudoCall = ghostCalls.find((call) => call.options.pseudoElement === "::before");
+    assert.ok(pseudoCall, "幽灵伪元素应播退场动画");
+    assert.deepEqual(pseudoCall.keyframes, [{ opacity: 1 }, { opacity: 0 }]);
+
+    const geometryCall = ghostCalls.find((call) => !call.options.pseudoElement);
+    assert.ok(geometryCall, "幽灵表面应播几何/阴影退场动画");
+    for (const frame of geometryCall.keyframes) {
+      assert.equal("opacity" in frame, false, "幽灵宿主不得有 opacity 帧");
+    }
+
+    const ghostChildren = Array.from(ghost.children);
+    const childCalls = animateCalls.filter((call) => ghostChildren.includes(call.element));
+    assert.equal(childCalls.length, ghostChildren.length, "幽灵子级各一条淡出");
+    assert.deepEqual(childCalls[0].keyframes, [{ opacity: 1 }, { opacity: 0 }]);
+
+    await settleAnimations();
+    assert.equal(
+      document.querySelectorAll("[data-dsh-transition-ghost]").length,
+      0,
+      "全部动画 settle 后幽灵应被移除",
+    );
   });
 });

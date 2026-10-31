@@ -118,17 +118,35 @@
     }
     return fallback;
   }
-  function defaultComputedStyle(element) {
+  function defaultComputedStyle(element, pseudoElement = null) {
     if (!isElement(element)) return null;
+    const pseudo = pseudoElement || void 0;
     const document2 = element.ownerDocument;
     const view = document2 && document2.defaultView;
-    if (view && typeof view.getComputedStyle === "function") return view.getComputedStyle(element);
+    if (view && typeof view.getComputedStyle === "function") {
+      return pseudo ? view.getComputedStyle(element, pseudo) : view.getComputedStyle(element);
+    }
     const scope = globalScope();
-    if (scope && typeof scope.getComputedStyle === "function") return scope.getComputedStyle(element);
+    if (scope && typeof scope.getComputedStyle === "function") {
+      return pseudo ? scope.getComputedStyle(element, pseudo) : scope.getComputedStyle(element);
+    }
     if (typeof window !== "undefined" && window && typeof window.getComputedStyle === "function") {
-      return window.getComputedStyle(element);
+      return pseudo ? window.getComputedStyle(element, pseudo) : window.getComputedStyle(element);
     }
     return null;
+  }
+  function readBackdropFilter(style) {
+    if (!style) return "";
+    let value = "";
+    try {
+      value = style.backdropFilter || style.webkitBackdropFilter || "";
+    } catch (error) {
+      value = "";
+    }
+    if (!value) value = readStyleProperty(style, "backdrop-filter");
+    if (!value) value = readStyleProperty(style, "-webkit-backdrop-filter");
+    const trimmed = String(value).trim();
+    return trimmed && trimmed.toLowerCase() !== "none" ? trimmed : "";
   }
   function defaultMatchMedia(query) {
     const scope = globalScope();
@@ -199,6 +217,27 @@
       opacityFrom: Number.isFinite(source.opacityFrom) ? source.opacityFrom : def.opacityFrom
     };
   }
+  function geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out) {
+    const def = surfaceDefFor(kind);
+    const geometry = geometryFor(def, timing);
+    const first = {};
+    const last = {};
+    if (independentTransforms) {
+      if (geometry.distancePx !== 0) {
+        first.translate = out ? "0 0" : "0 " + geometry.distancePx + "px";
+        last.translate = out ? "0 " + geometry.distancePx + "px" : "0 0";
+      }
+      if (geometry.scaleFrom !== 1) {
+        first.scale = out ? "1" : String(geometry.scaleFrom);
+        last.scale = out ? String(geometry.scaleFrom) : "1";
+      }
+    }
+    if (boxShadow) {
+      first.boxShadow = out ? boxShadow : "none";
+      last.boxShadow = out ? "none" : boxShadow;
+    }
+    return Object.keys(first).length > 0 ? [first, last] : [];
+  }
   function directElementChildren(element) {
     if (!isElement(element) || !element.childNodes) return [];
     const children = [];
@@ -207,8 +246,31 @@
     }
     return children;
   }
-  function naturalOpacity(element) {
-    const style = defaultComputedStyle(element);
+  function isGeneratedPseudoElement(style) {
+    if (!style) return false;
+    let content = "";
+    try {
+      content = style.content || "";
+    } catch (error) {
+      content = "";
+    }
+    const trimmed = String(content).trim().toLowerCase();
+    return trimmed !== "" && trimmed !== "none" && trimmed !== "normal" && trimmed !== "initial" && trimmed !== "inherit" && trimmed !== "unset";
+  }
+  function pseudoGlassFor(surface, computedStyle) {
+    try {
+      if (readBackdropFilter(computedStyle(surface))) return null;
+      for (const pseudo of ["::before", "::after"]) {
+        const style = computedStyle(surface, pseudo);
+        if (isGeneratedPseudoElement(style) && readBackdropFilter(style)) return pseudo;
+      }
+    } catch (error) {
+      return null;
+    }
+    return null;
+  }
+  function naturalOpacity(element, pseudoElement = null, computedStyle = defaultComputedStyle) {
+    const style = computedStyle(element, pseudoElement || null);
     if (!style) return 1;
     let value = NaN;
     try {
@@ -218,8 +280,8 @@
     }
     return Number.isFinite(value) ? value : 1;
   }
-  function naturalBoxShadow(element) {
-    const style = defaultComputedStyle(element);
+  function naturalBoxShadow(element, computedStyle = defaultComputedStyle) {
+    const style = computedStyle(element);
     if (!style) return null;
     let value = "";
     try {
@@ -238,22 +300,10 @@
   }
   function keyframesFor(kind, timing, independentTransforms, boxShadow = null) {
     const def = surfaceDefFor(kind);
-    const geometry = geometryFor(def, timing);
     if (def.splitFade) {
-      const first2 = {};
-      const last2 = {};
-      if (independentTransforms && geometry.distancePx !== 0) {
-        first2.translate = "0 " + geometry.distancePx + "px";
-        last2.translate = "0 0";
-        first2.scale = String(geometry.scaleFrom);
-        last2.scale = "1";
-      }
-      if (boxShadow) {
-        first2.boxShadow = "none";
-        last2.boxShadow = boxShadow;
-      }
-      return Object.keys(first2).length > 0 ? [first2, last2] : [];
+      return geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, false);
     }
+    const geometry = geometryFor(def, timing);
     const first = { opacity: geometry.opacityFrom };
     const last = { opacity: 1 };
     if (independentTransforms && geometry.distancePx !== 0) {
@@ -264,22 +314,10 @@
   }
   function exitKeyframesFor(kind, timing, independentTransforms, boxShadow = null) {
     const def = surfaceDefFor(kind);
-    const geometry = geometryFor(def, timing);
     if (def.splitFade) {
-      const first2 = {};
-      const last2 = {};
-      if (independentTransforms && geometry.distancePx !== 0) {
-        first2.translate = "0 0";
-        last2.translate = "0 " + geometry.distancePx + "px";
-        first2.scale = "1";
-        last2.scale = String(geometry.scaleFrom);
-      }
-      if (boxShadow) {
-        first2.boxShadow = boxShadow;
-        last2.boxShadow = "none";
-      }
-      return Object.keys(first2).length > 0 ? [first2, last2] : [];
+      return geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, true);
     }
+    const geometry = geometryFor(def, timing);
     const first = { opacity: 1 };
     const last = { opacity: geometry.opacityFrom };
     if (independentTransforms && geometry.distancePx !== 0) {
@@ -288,29 +326,40 @@
     }
     return [first, last];
   }
-  function animationSpecsFor(surface, kind, direction, independentTransforms) {
+  function animationSpecsFor(surface, kind, direction, independentTransforms, options = {}) {
     if (!isElement(surface)) return [];
     const def = surfaceDefFor(kind);
     const out = direction === "out";
+    const computedStyle = options && typeof options.computedStyle === "function" ? options.computedStyle : defaultComputedStyle;
     const timing = {
       distancePx: def.distancePx,
       scaleFrom: def.scaleFrom,
       opacityFrom: def.opacityFrom
     };
-    const boxShadow = def.animateShadow ? naturalBoxShadow(surface) : null;
-    const surfaceFrames = out ? exitKeyframesFor(kind, timing, independentTransforms, boxShadow) : keyframesFor(kind, timing, independentTransforms, boxShadow);
-    if (!def.splitFade) {
-      return surfaceFrames.length > 0 ? [{ element: surface, keyframes: surfaceFrames }] : [];
+    const pseudoGlass = def.splitFade ? null : pseudoGlassFor(surface, computedStyle);
+    const boxShadow = def.animateShadow || pseudoGlass !== null ? naturalBoxShadow(surface, computedStyle) : null;
+    if (!def.splitFade && pseudoGlass === null) {
+      const surfaceFrames2 = out ? exitKeyframesFor(kind, timing, independentTransforms, boxShadow) : keyframesFor(kind, timing, independentTransforms, boxShadow);
+      return surfaceFrames2.length > 0 ? [{ element: surface, keyframes: surfaceFrames2 }] : [];
     }
+    const surfaceFrames = geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out);
     const children = directElementChildren(surface);
-    if (children.length > 0) {
-      const specs = [];
-      if (surfaceFrames.length > 0) specs.push({ element: surface, keyframes: surfaceFrames });
-      for (const child of children) {
-        specs.push({ element: child, keyframes: fadeKeyframesFor(direction, naturalOpacity(child)) });
-      }
-      return specs;
+    const specs = [];
+    if (surfaceFrames.length > 0) specs.push({ element: surface, keyframes: surfaceFrames });
+    for (const child of children) {
+      specs.push({
+        element: child,
+        keyframes: fadeKeyframesFor(direction, naturalOpacity(child, null, computedStyle))
+      });
     }
+    if (pseudoGlass !== null) {
+      specs.push({
+        element: surface,
+        pseudoElement: pseudoGlass,
+        keyframes: fadeKeyframesFor(direction, naturalOpacity(surface, pseudoGlass, computedStyle))
+      });
+    }
+    if (children.length > 0 || pseudoGlass !== null) return specs;
     const from = out ? 1 : 0;
     const to = out ? 0 : 1;
     if (surfaceFrames.length === 0) {
@@ -728,17 +777,24 @@
   }
 
   // src/runtime.js
-  function defaultAnimator(element, keyframes, timing) {
+  function defaultAnimator(element, keyframes, timing, pseudoElement) {
     if (!isElement(element) || typeof element.animate !== "function") return null;
+    const options = {
+      duration: timing.durationMs,
+      easing: timing.easing,
+      fill: "both"
+    };
+    if (pseudoElement) options.pseudoElement = pseudoElement;
     try {
-      return element.animate(keyframes, {
-        duration: timing.durationMs,
-        easing: timing.easing,
-        fill: "both"
-      });
+      return element.animate(keyframes, options);
     } catch (error) {
       return null;
     }
+  }
+  function animationTargetsPseudo(animation, pseudoElement) {
+    if (!pseudoElement) return true;
+    const effect = animation && animation.effect;
+    return !!effect && effect.pseudoElement === pseudoElement;
   }
   function defaultRequestFrame(callback) {
     const scope = globalScope();
@@ -852,6 +908,10 @@
     const animator = typeof options.animator === "function" ? options.animator : defaultAnimator;
     const requestFrame = typeof options.requestFrame === "function" ? options.requestFrame : defaultRequestFrame;
     const cancelFrame = typeof options.cancelFrame === "function" ? options.cancelFrame : defaultCancelFrame;
+    const specOptions = typeof options.computedStyle === "function" ? { computedStyle: options.computedStyle } : {};
+    function specsFor(element, kind, direction) {
+      return animationSpecsFor(element, kind, direction, supportsIndependentTransforms(), specOptions);
+    }
     let lastApplied = /* @__PURE__ */ new WeakMap();
     let batchKeys = /* @__PURE__ */ new WeakMap();
     const ownedAnimations = /* @__PURE__ */ new Set();
@@ -939,11 +999,15 @@
       if (!canAnimate(element, intent.kind)) return;
       const timing = timingFor(intent.kind);
       if (!timing || !(timing.durationMs > 0)) return;
-      const specs = animationSpecsFor(element, intent.kind, "in", supportsIndependentTransforms());
+      const specs = specsFor(element, intent.kind, "in");
       let created = 0;
       for (const spec of specs) {
-        const animation = animator(spec.element, spec.keyframes, timing);
+        const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);
         if (!animation) continue;
+        if (!animationTargetsPseudo(animation, spec.pseudoElement)) {
+          cancelAnimation(animation);
+          continue;
+        }
         created += 1;
         ownedAnimations.add(animation);
         let released = false;
@@ -984,10 +1048,14 @@
         if (!isElement(target)) continue;
         const timing = timingFor(surface.kind);
         if (!timing || !(timing.durationMs > 0)) continue;
-        const specs = animationSpecsFor(target, surface.kind, "out", supportsIndependentTransforms());
+        const specs = specsFor(target, surface.kind, "out");
         for (const spec of specs) {
-          const animation = animator(spec.element, spec.keyframes, timing);
+          const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);
           if (!animation) continue;
+          if (!animationTargetsPseudo(animation, spec.pseudoElement)) {
+            cancelAnimation(animation);
+            continue;
+          }
           exitAnimations.add(animation);
           whenSettled(animation, () => {
             exitAnimations.delete(animation);

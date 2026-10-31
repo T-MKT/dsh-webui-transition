@@ -16,11 +16,13 @@ import {
   keyframesFor,
 } from "../src/frames.js";
 import {
+  buildGlassPanel,
   buildMenu,
   buildSettingsOverlay,
   computedStyle,
   document,
   disposeEnvironment,
+  pseudoGlassComputedStyle,
   resetEnvironment,
 } from "./helpers/env.mjs";
 
@@ -191,4 +193,131 @@ test("fadeKeyframesFor：'out' 从自然值到 0，其余从 0 到自然值", ()
 test("未知 kind 回退 SURFACE_DEFS.menu", () => {
   assert.deepEqual(keyframesFor("popover", MENU_TIMING, true), keyframesFor("menu", MENU_TIMING, true));
   assert.deepEqual(exitKeyframesFor("popover", MENU_TIMING, true), exitKeyframesFor("menu", MENU_TIMING, true));
+});
+
+// ---------------------------------------------------------------------------
+// v0.2.1 伪元素玻璃：表面不做 opacity，玻璃自身与子级分别淡入淡出
+// ---------------------------------------------------------------------------
+
+const GLASS_SHADOW = "rgb(0, 0, 0) 0px 8px 24px";
+
+function buildShadowedGlassPanel() {
+  const panel = buildGlassPanel();
+  panel.style.boxShadow = GLASS_SHADOW;
+  document.body.append(panel);
+  return panel;
+}
+
+test("伪元素玻璃 dialog 入场：表面只做几何/阴影，子级与伪元素各自 opacity", () => {
+  const panel = buildShadowedGlassPanel();
+  const specs = animationSpecsFor(panel, "dialog", "in", true, {
+    computedStyle: pseudoGlassComputedStyle(),
+  });
+
+  assert.equal(specs.length, 4, "表面几何 + 2 个子级 + 1 个伪元素");
+  assert.equal(specs[0].element, panel);
+  assert.equal(specs[0].pseudoElement, undefined);
+  assert.deepEqual(specs[0].keyframes, [
+    { translate: "0 12px", boxShadow: "none" },
+    { translate: "0 0", boxShadow: GLASS_SHADOW },
+  ]);
+  for (const frame of specs[0].keyframes) {
+    assert.equal("opacity" in frame, false, "伪元素玻璃表面不得有 opacity 帧（否则成为 backdrop-root）");
+  }
+
+  const [header, body] = Array.from(panel.children);
+  assert.deepEqual(specs[1], { element: header, keyframes: [{ opacity: 0 }, { opacity: 1 }] });
+  assert.deepEqual(specs[2], { element: body, keyframes: [{ opacity: 0 }, { opacity: 1 }] });
+  assert.deepEqual(specs[3], {
+    element: panel,
+    pseudoElement: "::before",
+    keyframes: [{ opacity: 0 }, { opacity: 1 }],
+  });
+});
+
+test("伪元素玻璃 dialog 退场：几何/阴影镜像，子级与伪元素淡出", () => {
+  const panel = buildShadowedGlassPanel();
+  const specs = animationSpecsFor(panel, "dialog", "out", true, {
+    computedStyle: pseudoGlassComputedStyle(),
+  });
+
+  assert.deepEqual(specs[0].keyframes, [
+    { translate: "0 0", boxShadow: GLASS_SHADOW },
+    { translate: "0 12px", boxShadow: "none" },
+  ]);
+  assert.deepEqual(specs[3].keyframes, [{ opacity: 1 }, { opacity: 0 }]);
+  assert.equal(specs[3].pseudoElement, "::before");
+});
+
+test("伪元素玻璃：::after 同样可被识别，伪元素自然 opacity 非 1 时回到计算值", () => {
+  const panel = buildGlassPanel();
+  document.body.append(panel);
+
+  const afterSpecs = animationSpecsFor(panel, "dialog", "in", true, {
+    computedStyle: pseudoGlassComputedStyle({ pseudo: "::after" }),
+  });
+  const afterSpec = afterSpecs.find((spec) => spec.pseudoElement !== undefined);
+  assert.equal(afterSpec.pseudoElement, "::after");
+
+  const halfSpecs = animationSpecsFor(panel, "dialog", "out", true, {
+    computedStyle: pseudoGlassComputedStyle({ opacity: "0.5" }),
+  });
+  const halfSpec = halfSpecs.find((spec) => spec.pseudoElement !== undefined);
+  assert.deepEqual(halfSpec.keyframes, [{ opacity: 0.5 }, { opacity: 0 }]);
+
+  const inHalfSpecs = animationSpecsFor(panel, "dialog", "in", true, {
+    computedStyle: pseudoGlassComputedStyle({ opacity: "0.5" }),
+  });
+  assert.deepEqual(
+    inHalfSpecs.find((spec) => spec.pseudoElement !== undefined).keyframes,
+    [{ opacity: 0 }, { opacity: 0.5 }],
+  );
+});
+
+test("伪元素玻璃：表面自身带 backdrop-filter 时维持整体 opacity 帧（自身动画安全）", () => {
+  const { overlay, panel } = buildSettingsOverlay();
+  document.body.append(overlay);
+  const selfGlassStyle = (element) => ({
+    backdropFilter: "blur(40px) saturate(1.5)",
+    opacity: "1",
+    boxShadow: "none",
+    content: "none",
+    getPropertyValue: () => "",
+  });
+
+  const specs = animationSpecsFor(panel, "dialog", "in", true, { computedStyle: selfGlassStyle });
+  assert.deepEqual(specs, [
+    {
+      element: panel,
+      keyframes: [
+        { opacity: 0, translate: "0 12px" },
+        { opacity: 1, translate: "0 0" },
+      ],
+    },
+  ]);
+});
+
+test("伪元素玻璃：无直接元素子级时仍有几何 + 伪元素两条规格", () => {
+  const panel = document.createElement("div");
+  panel.setAttribute("role", "dialog");
+  document.body.append(panel);
+
+  const specs = animationSpecsFor(panel, "dialog", "in", true, {
+    computedStyle: pseudoGlassComputedStyle(),
+  });
+  assert.equal(specs.length, 2);
+  assert.deepEqual(specs[0], { element: panel, keyframes: [{ translate: "0 12px" }, { translate: "0 0" }] });
+  assert.equal(specs[1].pseudoElement, "::before");
+});
+
+test("伪元素玻璃：independentTransforms=false 时降级为子级 + 伪元素淡入（无表面规格）", () => {
+  const panel = buildGlassPanel();
+  document.body.append(panel);
+
+  const specs = animationSpecsFor(panel, "dialog", "in", false, {
+    computedStyle: pseudoGlassComputedStyle(),
+  });
+  assert.equal(specs.some((spec) => spec.element === panel && spec.pseudoElement === undefined), false);
+  assert.equal(specs.length, 3, "2 个子级 + 1 个伪元素");
+  assert.equal(specs[2].pseudoElement, "::before");
 });
