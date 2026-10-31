@@ -1,5 +1,7 @@
 # dsh-webui-transition：计划基线迁移到 dsh 0.2.2-alpha.2
 
+> **历史标记**：本文档属于 v0.1.0 计划（dsh 版本基线迁移记录），仅作为版本基线证据保留，不再作为开发依据；v0.2.0 起的唯一开发真源是 `.plan/v0.2.0/plan-b-rewrite.md`（基线仍为 dsh `0.2.2-alpha.2`）。
+
 > 本文档是 `/plugin-compatible-check` 的产出：只修正「计划文档对 dsh 的事实描述与契约」，不写插件代码。
 > 执行完本文档后，`.plan/webui-transition.md` 即视为基于 `0.2.2-alpha.2` 编写，可照原 §3 开工。
 > 状态：`- [ ]` 未完成 / `- [x]` 已完成；节点编号在本次迁移内保持不变。

@@ -1,7 +1,7 @@
 {
   "name": "@tak1208/dsh-webui-transition",
-  "version": "0.1.0",
-  "description": "DSH Web GUI 扩展：为设置面板与各级下拉菜单补上开合过渡动画（Client-only bundle，零第三方运行时依赖）。",
+  "version": "0.2.0",
+  "description": "DSH Web GUI 扩展：为设置面板与各级下拉菜单补上开合过渡动画（Client-only bundle，源码 ESM + esbuild 构建，零第三方运行时依赖）。",
   "type": "module",
   "main": "./index.js",
   "exports": {
@@ -33,6 +33,12 @@
     }
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "jsdom": "^30.1.3"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "pretest": "node scripts/build.mjs",
+    "test": "node --test"
   }
 }
