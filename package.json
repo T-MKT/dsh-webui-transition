@@ -1,7 +1,24 @@
 {
   "name": "@tak1208/dsh-webui-transition",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "DSH Web GUI 扩展：为设置面板与各级下拉菜单补上开合过渡动画（Client-only bundle，源码 ESM + esbuild 构建，零第三方运行时依赖）。",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "dsh-bundle",
+    "webui",
+    "transition",
+    "animation"
+  ],
+  "homepage": "https://github.com/T-MKT/dsh-webui-transition#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/T-MKT/dsh-webui-transition.git"
+  },
+  "bugs": {
+    "url": "https://github.com/T-MKT/dsh-webui-transition/issues"
+  },
   "type": "module",
   "main": "./index.js",
   "exports": {
@@ -19,6 +36,10 @@
   ],
   "author": "tak1208",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "engines": {
     "dsh": ">=0.2.2-alpha.2 <0.3.0"
   },
@@ -39,6 +60,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "pretest": "node scripts/build.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "prepublishOnly": "pnpm test"
   }
 }
