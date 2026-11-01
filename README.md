@@ -1,5 +1,7 @@
 # dsh-webui-transition
 
+[![npm version](https://img.shields.io/npm/v/@tak1208/dsh-webui-transition)](https://www.npmjs.com/package/@tak1208/dsh-webui-transition)
+
 为 DSH（DeepSeek Harness）Web GUI 补上两处开合过渡动画的第三方客户端插件：各级下拉菜单与设置面板。它是一个 dsh bundle，纯浏览器半区运行，不注册 slot、不修改 dsh 源码、无第三方运行时依赖。
 
 ## 效果范围
@@ -26,22 +28,30 @@
 
 本仓库形态为 dsh bundle：`package.json` 声明 `dsh.bundle.patch`（Loader 插入一行插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。兼容 dsh `0.2.2-alpha.2`（`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`）。
 
-**开发期（本仓库未发布时）**：用 dsh 的 `plugin_manager` 工具安装，`target` 取本仓库绝对路径：
-
-```json
-{ "action": "install_bundle", "target": "/absolute/path/to/dsh-webui-transition" }
-```
-
-- 0.2.1-alpha.2 起 dsh 不允许直接覆盖安装已安装的包（会返回 `already-installed`）；重装请先 `action: "remove_bundle"`，再 `install_bundle`。
-- 安装成功后插件会出现在 Settings → 内置插件清单里。
-
-**发布到 npm 之后**：
+**通过 npm 安装（推荐）**：
 
 ```bash
 dsh plugin --profile web add @tak1208/dsh-webui-transition
 ```
 
-卸载：`dsh plugin --profile web remove @tak1208/dsh-webui-transition`（或用 `plugin_manager` 的 `remove_bundle`）。
+也可以让 dsh 的 `plugin_manager` 工具直接安装 npm 包：
+
+```json
+{ "action": "install_bundle", "target": "@tak1208/dsh-webui-transition" }
+```
+
+- 0.2.1-alpha.2 起 dsh 不允许直接覆盖安装已安装的包（会返回 `already-installed`）；重装请先 `action: "remove_bundle"`，再 `install_bundle`。
+- 安装成功后插件会出现在 Settings → 内置插件清单里。
+- 卸载：`dsh plugin --profile web remove @tak1208/dsh-webui-transition`（或用 `plugin_manager` 的 `remove_bundle`）。
+
+**从源码安装（开发期 / 未发布时）**：用 `plugin_manager` 安装，`target` 取本仓库绝对路径：
+
+```json
+{ "action": "install_bundle", "target": "/absolute/path/to/dsh-webui-transition" }
+```
+
+- 本地路径安装与 npm 版本同名互斥，切换来源要先 `remove_bundle` 再 `install_bundle`。
+- 本仓库需先 `pnpm install && pnpm build` 生成 `client.js`。
 
 ## 退出开关
 
