@@ -1,5 +1,7 @@
 # dsh-webui-transition
 
+[![npm version](https://img.shields.io/npm/v/@tak1208/dsh-webui-transition)](https://www.npmjs.com/package/@tak1208/dsh-webui-transition)
+
 A third-party client plugin that adds open/close transitions to two places in the DSH (DeepSeek Harness) Web GUI: dropdown menus and the settings panel. It ships as a dsh bundle, runs entirely in the browser half, registers no slots, does not modify dsh source code, and has no third-party runtime dependencies.
 
 ## Scope
@@ -26,22 +28,30 @@ It only takes over the two surfaces the host does not animate, covering both ent
 
 This repository is a dsh bundle: `package.json` declares `dsh.bundle.patch` (one plugin line inserted by the Loader) and `dsh.client` (browser half, pointing at the build artifact `client.js`, classic script). It is compatible with dsh `0.2.2-alpha.2` (`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`).
 
-**During development (before this repository is published)**: install it with dsh's `plugin_manager` tool, passing the absolute path of this repository as `target`:
-
-```json
-{ "action": "install_bundle", "target": "/absolute/path/to/dsh-webui-transition" }
-```
-
-- Since 0.2.1-alpha.2, dsh refuses to reinstall over an installed package (it returns `already-installed`); to reinstall, run `action: "remove_bundle"` first, then `install_bundle`.
-- After installation the plugin shows up in Settings → Built-in plugins.
-
-**After publishing to npm**:
+**Install from npm (recommended)**:
 
 ```bash
 dsh plugin --profile web add @tak1208/dsh-webui-transition
 ```
 
-Uninstall: `dsh plugin --profile web remove @tak1208/dsh-webui-transition` (or `plugin_manager` with `remove_bundle`).
+You can also install the npm package directly with dsh's `plugin_manager` tool:
+
+```json
+{ "action": "install_bundle", "target": "@tak1208/dsh-webui-transition" }
+```
+
+- Since 0.2.1-alpha.2, dsh refuses to reinstall over an installed package (it returns `already-installed`); to reinstall, run `action: "remove_bundle"` first, then `install_bundle`.
+- After installation the plugin shows up in Settings → Built-in plugins.
+- Uninstall: `dsh plugin --profile web remove @tak1208/dsh-webui-transition` (or `plugin_manager` with `remove_bundle`).
+
+**Install from source (during development / before publication)**: install it with `plugin_manager`, passing the absolute path of this repository as `target`:
+
+```json
+{ "action": "install_bundle", "target": "/absolute/path/to/dsh-webui-transition" }
+```
+
+- A local-path install and the npm version share the same package name and are mutually exclusive; to switch sources, run `remove_bundle` first, then `install_bundle`.
+- This repository must be built first (`pnpm install && pnpm build`) to generate `client.js`.
 
 ## Opting Out
 
