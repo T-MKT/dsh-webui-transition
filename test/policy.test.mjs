@@ -110,7 +110,7 @@ describe("timing：fallback / clamp / 几何起点", () => {
     assert.equal(policy.timing("listbox").distancePx, -4);
     const dialog = policy.timing("dialog");
     assert.equal(dialog.distancePx, 12);
-    assert.equal(dialog.scaleFrom, 1);
+    assert.equal(dialog.scaleFrom, 0.98);
     assert.equal(dialog.opacityFrom, 0);
     const mask = policy.timing("mask");
     assert.equal(mask.distancePx, 0);

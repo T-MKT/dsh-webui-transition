@@ -69,7 +69,7 @@ export const SURFACE_DEFS = {
     minMs: 160,
     maxMs: 240,
     distancePx: 12,
-    scaleFrom: 1,
+    scaleFrom: 0.98,
     opacityFrom: 0,
     easing: DIALOG_EASING,
     splitFade: false,

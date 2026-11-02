@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Web UI transitions",
+    "description": "Adds origin-aware open and close transitions to dropdown menus and dialog panels in the DSH Web GUI."
+  }
+}

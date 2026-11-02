@@ -10,6 +10,10 @@
  * 表面自身无 backdrop-filter、但 ::before/::after 带 backdrop-filter 时，表面不能做
  * opacity 动画（会成为 backdrop-root，使伪元素无法采样页面背景）；改为表面几何/阴影 +
  * 直接子级 opacity + 伪元素自身 opacity（后者由 runtime 用 WAAPI pseudoElement 播放）。
+ *
+ * v0.3.0 追加「原点感知」几何（.agents/plan/v0.3.0/origin-aware-and-settings.md §3.3）：
+ * 几何帧接受 `geometry = { originX, originY, translateX, translateY }`，写
+ * `transformOrigin` 与方向平移；geometry 为空时不做表面几何动画（仅淡入）。
  */
 
 import { SURFACE_DEFS } from "./defs.js";
@@ -22,7 +26,7 @@ function surfaceDefFor(kind) {
 
 // timing 快照里的几何参数缺失/非有限数时，回退到该 kind 的 SURFACE_DEFS 值；
 // 不再硬编码 0 / 1（§3.6）。
-function geometryFor(def, timing) {
+function geometryValuesFor(def, timing) {
   const source = timing && typeof timing === "object" ? timing : {};
   return {
     distancePx: Number.isFinite(source.distancePx) ? source.distancePx : def.distancePx,
@@ -31,28 +35,40 @@ function geometryFor(def, timing) {
   };
 }
 
-// 表面级几何帧（translate/scale + 可选 boxShadow），不含 opacity：
+// 像素值格式化：整数不带小数，其余保留原值（geometry 由 origin.js 计算，可能是小数）。
+function px(value) {
+  return String(value) + "px";
+}
+
+function originValue(geometry) {
+  return px(geometry.originX) + " " + px(geometry.originY);
+}
+
+function translateValue(geometry) {
+  return px(geometry.translateX) + " " + px(geometry.translateY);
+}
+
+// 表面级几何帧（transform-origin + 方向平移 + 缩放 + 可选 boxShadow），不含 opacity：
 // splitFade 表面与伪元素玻璃表面共用。direction 为 "out" 时是入场帧的镜像。
-function geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out) {
+// geometry 为空（无法推断触发源且回退为仅淡入）或浏览器不支持独立 transform 时返回 []。
+function geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out, geometry) {
+  if (!geometry || !independentTransforms) return [];
   const def = surfaceDefFor(kind);
-  const geometry = geometryFor(def, timing);
-  const first = {};
-  const last = {};
-  if (independentTransforms) {
-    if (geometry.distancePx !== 0) {
-      first.translate = out ? "0 0" : "0 " + geometry.distancePx + "px";
-      last.translate = out ? "0 " + geometry.distancePx + "px" : "0 0";
-    }
-    if (geometry.scaleFrom !== 1) {
-      first.scale = out ? "1" : String(geometry.scaleFrom);
-      last.scale = out ? String(geometry.scaleFrom) : "1";
-    }
+  const values = geometryValuesFor(def, timing);
+  const origin = originValue(geometry);
+  const first = { transformOrigin: origin };
+  const last = { transformOrigin: origin };
+  first.translate = out ? "0 0" : translateValue(geometry);
+  last.translate = out ? translateValue(geometry) : "0 0";
+  if (values.scaleFrom !== 1) {
+    first.scale = out ? "1" : String(values.scaleFrom);
+    last.scale = out ? String(values.scaleFrom) : "1";
   }
   if (boxShadow) {
     first.boxShadow = out ? boxShadow : "none";
     last.boxShadow = out ? "none" : boxShadow;
   }
-  return Object.keys(first).length > 0 ? [first, last] : [];
+  return [first, last];
 }
 
 // 直接元素子级（只含 nodeType===1）。splitFade 语义把透明度下沉到这一层：
@@ -138,58 +154,86 @@ export function fadeKeyframesFor(direction, opacity) {
   return [{ opacity: 0 }, { opacity: value }];
 }
 
-// 入场关键帧（§3.6）：
-// - splitFade 表面只写几何（translate/scale）+ 可选阴影淡入，不写 opacity；
-// - 非 splitFade 表面维持整体关键帧（opacity [+translate]；mask 的 distancePx 为 0，
-//   自然没有 translate）。
-export function keyframesFor(kind, timing, independentTransforms, boxShadow = null) {
+// 入场关键帧（§3.6 + v0.3.0 原点感知）：
+// - splitFade 表面只写几何（transform-origin/translate/scale）+ 可选阴影淡入，不写 opacity；
+// - 非 splitFade 表面维持整体关键帧（opacity [+ 几何]；mask 的 distancePx 为 0，
+//   自然没有位移）。
+// geometry 为空时：splitFade 表面无表面帧；非 splitFade 表面只出 opacity 帧（仅淡入）。
+export function keyframesFor(kind, timing, independentTransforms, boxShadow = null, geometry = null) {
   const def = surfaceDefFor(kind);
   if (def.splitFade) {
-    return geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, false);
+    return geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, false, geometry);
   }
 
-  const geometry = geometryFor(def, timing);
-  const first = { opacity: geometry.opacityFrom };
+  const values = geometryValuesFor(def, timing);
+  const first = { opacity: values.opacityFrom };
   const last = { opacity: 1 };
-  if (independentTransforms && geometry.distancePx !== 0) {
-    first.translate = "0 " + geometry.distancePx + "px";
-    last.translate = "0 0";
+  if (geometry) {
+    if (independentTransforms) {
+      const origin = originValue(geometry);
+      first.transformOrigin = origin;
+      last.transformOrigin = origin;
+      first.translate = translateValue(geometry);
+      last.translate = "0 0";
+      if (values.scaleFrom !== 1) {
+        first.scale = String(values.scaleFrom);
+        last.scale = "1";
+      }
+    }
+    if (boxShadow) {
+      first.boxShadow = "none";
+      last.boxShadow = boxShadow;
+    }
   }
   return [first, last];
 }
 
 // 退场关键帧 = 入场镜像（splitFade 表面同样不含 opacity，末帧阴影回到 "none"）。
-export function exitKeyframesFor(kind, timing, independentTransforms, boxShadow = null) {
+export function exitKeyframesFor(kind, timing, independentTransforms, boxShadow = null, geometry = null) {
   const def = surfaceDefFor(kind);
   if (def.splitFade) {
-    return geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, true);
+    return geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, true, geometry);
   }
 
-  const geometry = geometryFor(def, timing);
+  const values = geometryValuesFor(def, timing);
   const first = { opacity: 1 };
-  const last = { opacity: geometry.opacityFrom };
-  if (independentTransforms && geometry.distancePx !== 0) {
-    first.translate = "0 0";
-    last.translate = "0 " + geometry.distancePx + "px";
+  const last = { opacity: values.opacityFrom };
+  if (geometry) {
+    if (independentTransforms) {
+      const origin = originValue(geometry);
+      first.transformOrigin = origin;
+      last.transformOrigin = origin;
+      first.translate = "0 0";
+      last.translate = translateValue(geometry);
+      if (values.scaleFrom !== 1) {
+        first.scale = "1";
+        last.scale = String(values.scaleFrom);
+      }
+    }
+    if (boxShadow) {
+      first.boxShadow = boxShadow;
+      last.boxShadow = "none";
+    }
   }
   return [first, last];
 }
 
-// 把一个表面拆成若干条 WAAPI 动画规格（§3.6 + v0.2.0 伪元素玻璃）：
-// - splitFade 表面：表面几何/阴影一条（若表面帧非空）+ 每个直接元素子级一条
+// 把一个表面拆成若干条 WAAPI 动画规格（§3.6 + v0.2.0 伪元素玻璃 + v0.3.0 原点感知）：
+// - splitFade 表面：表面几何/阴影一条（geometry 非空时）+ 每个直接元素子级一条
 //   opacity（0 ↔ 自然值）；无直接元素子级时回退为「表面整体」（opacity 0↔1
 //   并入表面帧；无几何帧时单独 opacity 帧）。
 // - 伪元素玻璃表面（非 splitFade 且玻璃在 ::before/::after）：同 splitFade 的拆分，
 //   另加伪元素自身 opacity 规格（带 pseudoElement 字段，由 runtime 播放）。
 // - 非 splitFade 表面（玻璃在自身或不是玻璃）：仅表面整体一条。
-// 只有 animateShadow 为 true 的表面（或伪元素玻璃表面）才读取并传入 naturalBoxShadow，
-// 使阴影与玻璃/内容同步淡入淡出，避免「先出现只有阴影的轮廓」。
+// 只有 animateShadow 为 true 的表面（或伪元素玻璃表面）且 geometry 非空时才读取并传入
+// naturalBoxShadow，使阴影与玻璃/内容同步淡入淡出，避免「先出现只有阴影的轮廓」。
 export function animationSpecsFor(surface, kind, direction, independentTransforms, options = {}) {
   if (!isElement(surface)) return [];
   const def = surfaceDefFor(kind);
   const out = direction === "out";
   const computedStyle =
     options && typeof options.computedStyle === "function" ? options.computedStyle : defaultComputedStyle;
+  const geometry = options && options.geometry ? options.geometry : null;
   const timing = {
     distancePx: def.distancePx,
     scaleFrom: def.scaleFrom,
@@ -198,16 +242,18 @@ export function animationSpecsFor(surface, kind, direction, independentTransform
   // 只有「整体 opacity 动画」的表面才需要伪元素玻璃检测（splitFade 表面本就不动画自身 opacity）。
   const pseudoGlass = def.splitFade ? null : pseudoGlassFor(surface, computedStyle);
   const boxShadow =
-    def.animateShadow || pseudoGlass !== null ? naturalBoxShadow(surface, computedStyle) : null;
+    geometry && (def.animateShadow || pseudoGlass !== null)
+      ? naturalBoxShadow(surface, computedStyle)
+      : null;
 
   if (!def.splitFade && pseudoGlass === null) {
     const surfaceFrames = out
-      ? exitKeyframesFor(kind, timing, independentTransforms, boxShadow)
-      : keyframesFor(kind, timing, independentTransforms, boxShadow);
+      ? exitKeyframesFor(kind, timing, independentTransforms, boxShadow, geometry)
+      : keyframesFor(kind, timing, independentTransforms, boxShadow, geometry);
     return surfaceFrames.length > 0 ? [{ element: surface, keyframes: surfaceFrames }] : [];
   }
 
-  const surfaceFrames = geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out);
+  const surfaceFrames = geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out, geometry);
   const children = directElementChildren(surface);
   const specs = [];
   if (surfaceFrames.length > 0) specs.push({ element: surface, keyframes: surfaceFrames });

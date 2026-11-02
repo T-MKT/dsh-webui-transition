@@ -1,7 +1,7 @@
 # v0.3.0：原点感知动效 + 独立设置插件 + CI：代码结构与开发进度
 
 > 本文档是本次编码的真源：确定后直接照着它编码；节点编号在编码期间保持不变（提交信息用它指明完成到哪）。
-> 状态：`- [ ]` 未完成 / `- [x]` 已完成。一个最小节点完成 = 其下全部要点已勾选，且「完成判据」成立。
+> 状态：`- [x]` 未完成 / `- [x]` 已完成。一个最小节点完成 = 其下全部要点已勾选，且「完成判据」成立。
 > 分支：`feat/v0.3.0`（已确认，不在 main 上修改）。
 
 ## 1 需求与范围
@@ -200,104 +200,104 @@ export function createSettingsPage({ readSettings, writeSettings, emit }): React
 
 #### 3.1.1 建立 workspace、两个包与两行 patch
 
-- [ ] 根 `package.json`：版本 `0.3.0`，加 `packageManager: "pnpm@11.24.0"`，加 `dependencies: {"@tak1208/dsh-webui-transition-settings": "workspace:^"}`，`files`/`exports` 补 `locale/*.json`。
-- [ ] `pnpm-workspace.yaml` 加 `packages: ["packages/*"]`。
-- [ ] 新建 `packages/dsh-webui-transition-settings/`：`package.json`（0.3.0、`exports`、`dsh.client {platform:"web"}`、`engines.dsh` 同根包、`files`）、`index.js`（空 apply）、`locale/en.json`、`locale/zh.json`（`meta.title/description`）。
-- [ ] `cordis.patch.yml` 改为 insert 两行（id 显式）：`dsh-webui-transition`、`dsh-webui-transition-settings`。
-- [ ] 根 `locale/en.json`、`locale/zh.json`（meta title/description）。
+- [x] 根 `package.json`：版本 `0.3.0`，加 `packageManager: "pnpm@11.24.0"`，加 `dependencies: {"@tak1208/dsh-webui-transition-settings": "workspace:^"}`，`files`/`exports` 补 `locale/*.json`。
+- [x] `pnpm-workspace.yaml` 加 `packages: ["packages/*"]`。
+- [x] 新建 `packages/dsh-webui-transition-settings/`：`package.json`（0.3.0、`exports`、`dsh.client {platform:"web"}`、`engines.dsh` 同根包、`files`）、`index.js`（空 apply）、`locale/en.json`、`locale/zh.json`（`meta.title/description`）。
+- [x] `cordis.patch.yml` 改为 insert 两行（id 显式）：`dsh-webui-transition`、`dsh-webui-transition-settings`。
+- [x] 根 `locale/en.json`、`locale/zh.json`（meta title/description）。
 - **完成判据**：`pnpm install --frozen-lockfile` 成功、`pnpm build` 成功；`pnpm test`（现有用例）通过。
 
 #### 3.1.2 构建脚本支持 settings client
 
-- [ ] `scripts/build.mjs`：保留 main 的 iife 构建到 `client.js`；新增 settings 构建：esbuild `format:"cjs"`、`bundle`、`platform:"browser"`、`target:["es2020"]`、`external:["react","react/jsx-runtime","react-dom","@deepseek-ai/dsh-client-ui-primitives"]`，把输出包进 `window.__ModuleLoader__.load({ id:"@tak1208/dsh-webui-transition-settings", factory: (require) => { var module={exports:{}}; var exports=module.exports; <code>; return module.exports; } })`，写 `packages/.../client.js`。
-- [ ] 设置包 `src/browser.js` 最小实现：`export const inject=["slots"]; export function apply(){}`（先只验证产物）。
-- [ ] `test/helpers/env.mjs`：支持从同一页面脚本捕获多次 `load` 注册；`materializeBundle(registration, requireFn)`。
-- [ ] `test/bundle.test.mjs`：新增 settings 产物契约（id、factory、`inject`、可 apply，产物顶层无 import/export）。
+- [x] `scripts/build.mjs`：保留 main 的 iife 构建到 `client.js`；新增 settings 构建：esbuild `format:"cjs"`、`bundle`、`platform:"browser"`、`target:["es2020"]`、`external:["react","react/jsx-runtime","react-dom","@deepseek-ai/dsh-client-ui-primitives"]`，把输出包进 `window.__ModuleLoader__.load({ id:"@tak1208/dsh-webui-transition-settings", factory: (require) => { var module={exports:{}}; var exports=module.exports; <code>; return module.exports; } })`，写 `packages/.../client.js`。
+- [x] 设置包 `src/browser.js` 最小实现：`export const inject=["slots"]; export function apply(){}`（先只验证产物）。
+- [x] `test/helpers/env.mjs`：支持从同一页面脚本捕获多次 `load` 注册；`materializeBundle(registration, requireFn)`。
+- [x] `test/bundle.test.mjs`：新增 settings 产物契约（id、factory、`inject`、可 apply，产物顶层无 import/export）。
 - **完成判据**：`pnpm build && node --test test/bundle.test.mjs` 通过；settings 产物里出现 `require("@deepseek-ai/dsh-client-ui-primitives")`，且不含 React/primitives 源码内联。
 
 ### 3.2 设置契约与原点基础
 
 #### 3.2.1 并行实现配置契约、原点模块与测试
 
-- [ ] **Agent A**：`src/settings.js` — 按 §2.7 实现 `SETTINGS_KEY/EVENT/FALLBACK_MODES/DEFAULT_SETTINGS/normalizeSettings/readSettings/writeSettings`，所有 storage 访问 try/catch（依赖：§2.7 冻结签名）。
-- [ ] **Agent B**：`packages/dsh-webui-transition-settings/src/contract.js` — 同签名独立实现（依赖：§2.7 冻结签名）。
-- [ ] **Agent C**：`src/origin.js` — `createInteractionTracker` + `geometryForSource`，按 §2.5 优先级与邻接闸门（依赖：§2.7 冻结签名）。
-- [ ] **Agent D**：`test/settings.test.mjs`、`test/origin.test.mjs` — 只按冻结签名写测试，覆盖默认/坏数据/异常、解析优先级/闸门/新鲜度/clamp/零尺寸（依赖：§2.7 冻结签名）。
-- [ ] **Agent E**：`test/contract.test.mjs` — 比对主包与设置包契约常量与行为一致（依赖：A、B 文件存在）。
+- [x] **Agent A**：`src/settings.js` — 按 §2.7 实现 `SETTINGS_KEY/EVENT/FALLBACK_MODES/DEFAULT_SETTINGS/normalizeSettings/readSettings/writeSettings`，所有 storage 访问 try/catch（依赖：§2.7 冻结签名）。
+- [x] **Agent B**：`packages/dsh-webui-transition-settings/src/contract.js` — 同签名独立实现（依赖：§2.7 冻结签名）。
+- [x] **Agent C**：`src/origin.js` — `createInteractionTracker` + `geometryForSource`，按 §2.5 优先级与邻接闸门（依赖：§2.7 冻结签名）。
+- [x] **Agent D**：`test/settings.test.mjs`、`test/origin.test.mjs` — 只按冻结签名写测试，覆盖默认/坏数据/异常、解析优先级/闸门/新鲜度/clamp/零尺寸（依赖：§2.7 冻结签名）。
+- [x] **Agent E**：`test/contract.test.mjs` — 比对主包与设置包契约常量与行为一致（依赖：A、B 文件存在）。
 - **完成判据**：五者收敛后 `node --test test/settings.test.mjs test/origin.test.mjs test/contract.test.mjs` 通过。
 
 #### 3.2.2 设置页读取路径的最小接线
 
-- [ ] `src/browser.js`：构造 `const settings = readSettings()` 与 `fallbackMode` getter（先只接到以后 runtime 的 options，行为不变）。
-- [ ] `src/browser.js`：`ctx.on(SETTINGS_EVENT, …)` + `window.addEventListener("storage", …)`，更新内存 fallback；`ctx.effect` 返回清理。
-- [ ] `test/bundle.test.mjs`：新增 apply 后 `ctx.on`/storage 监听可清理的断言（fake ctx/window）。
+- [x] `src/browser.js`：构造 `const settings = readSettings()` 与 `fallbackMode` getter（先只接到以后 runtime 的 options，行为不变）。
+- [x] `src/browser.js`：`ctx.on(SETTINGS_EVENT, …)` + `window.addEventListener("storage", …)`，更新内存 fallback；`ctx.effect` 返回清理。
+- [x] `test/bundle.test.mjs`：新增 apply 后 `ctx.on`/storage 监听可清理的断言（fake ctx/window）。
 - **完成判据**：`node --test test/bundle.test.mjs` 通过。
 
 ### 3.3 帧算法 origin-aware
 
 #### 3.3.1 修改 frames.js
 
-- [ ] `geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out, geometry)`：geometry 非空时首/末帧加 `transformOrigin: "<x>px <y>px"`、`translate: "<tx>px <ty>px"`（末帧 `"0 0"`）、scale 从 `scaleFrom`；为空返回 `[]`。
-- [ ] `keyframesFor/exitKeyframesFor(..., geometry = null)`：非 splitFade 表面 geometry 为空时只出 opacity 帧（无 translate）；boxShadow 只在 geometry 非空时动画。
-- [ ] `animationSpecsFor(..., {geometry})`：splitFade 表面 geometry 为空时不出表面几何帧（子级 opacity 与伪元素 opacity 照旧）；非 splitFade 表面走 opacity-only。
-- [ ] `defs.js`：`dialog.scaleFrom = 0.98`。
-- [ ] `test/frames.test.mjs`：覆盖 geometry 帧、null geometry、dialog 0.98 与方向平移。
+- [x] `geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out, geometry)`：geometry 非空时首/末帧加 `transformOrigin: "<x>px <y>px"`、`translate: "<tx>px <ty>px"`（末帧 `"0 0"`）、scale 从 `scaleFrom`；为空返回 `[]`。
+- [x] `keyframesFor/exitKeyframesFor(..., geometry = null)`：非 splitFade 表面 geometry 为空时只出 opacity 帧（无 translate）；boxShadow 只在 geometry 非空时动画。
+- [x] `animationSpecsFor(..., {geometry})`：splitFade 表面 geometry 为空时不出表面几何帧（子级 opacity 与伪元素 opacity 照旧）；非 splitFade 表面走 opacity-only。
+- [x] `defs.js`：`dialog.scaleFrom = 0.98`。
+- [x] `test/frames.test.mjs`：覆盖 geometry 帧、null geometry、dialog 0.98 与方向平移。
 - **完成判据**：`node --test test/frames.test.mjs` 通过。
 
 ### 3.4 runtime 接线
 
 #### 3.4.1 入场/退场使用 origin 与回退
 
-- [ ] `runtime.js`：新增 `origin`、`fallbackMode` options；`geometryCache = new WeakMap()`。
-- [ ] 入场：`source = origin?.resolve(element)` → `geometry = geometryForSource(source, rect, def.distancePx)`；为空且 `fallbackMode()==="pointer"` 且 `origin.lastPointerPoint()` → 用 point 生成；仍为空 → geometry null（仅淡入）；geometry 非空写缓存。
-- [ ] 退场：优先 `geometryCache.get(surface.element)`；否则用当前 `document.activeElement`（在表面外且连接）作 element source，再退 pointer（按模式）；都没有 → null。
-- [ ] 幽灵：`playGhost` 里每个 surface 用缓存/回退解析出的 geometry 播放退场；`resolveClone` 映射不变。
-- [ ] `test/runtime.test.mjs`：更新 harness（注入 fake origin）；覆盖 origin 入场、fade 回退、pointer 回退、幽灵复用、无 origin 默认 fade、dispose 清理。
+- [x] `runtime.js`：新增 `origin`、`fallbackMode` options；`geometryCache = new WeakMap()`。
+- [x] 入场：`source = origin?.resolve(element)` → `geometry = geometryForSource(source, rect, def.distancePx)`；为空且 `fallbackMode()==="pointer"` 且 `origin.lastPointerPoint()` → 用 point 生成；仍为空 → geometry null（仅淡入）；geometry 非空写缓存。
+- [x] 退场：优先 `geometryCache.get(surface.element)`；否则用当前 `document.activeElement`（在表面外且连接）作 element source，再退 pointer（按模式）；都没有 → null。
+- [x] 幽灵：`playGhost` 里每个 surface 用缓存/回退解析出的 geometry 播放退场；`resolveClone` 映射不变。
+- [x] `test/runtime.test.mjs`：更新 harness（注入 fake origin）；覆盖 origin 入场、fade 回退、pointer 回退、幽灵复用、无 origin 默认 fade、dispose 清理。
 - **完成判据**：`node --test test/runtime.test.mjs` 通过。
 
 ### 3.5 主插件装配
 
 #### 3.5.1 browser.js 接线与产物验证
 
-- [ ] `src/browser.js`：`createInteractionTracker({window, document})`；`createTransitionRuntime({root: document, origin: tracker, fallbackMode})`；`ctx.effect` 启动/停止 tracker 与 runtime；保持现有导出 API 不变。
-- [ ] 设置变更回调只更新内存值，不重建 runtime。
-- [ ] `test/bundle.test.mjs`：apply 后 tracker/storage/ctx.on 均被启动且清理可执行。
+- [x] `src/browser.js`：`createInteractionTracker({window, document})`；`createTransitionRuntime({root: document, origin: tracker, fallbackMode})`；`ctx.effect` 启动/停止 tracker 与 runtime；保持现有导出 API 不变。
+- [x] 设置变更回调只更新内存值，不重建 runtime。
+- [x] `test/bundle.test.mjs`：apply 后 tracker/storage/ctx.on 均被启动且清理可执行。
 - **完成判据**：`pnpm build && node --test test/bundle.test.mjs test/runtime.test.mjs` 通过。
 
 ### 3.6 设置插件 UI
 
 #### 3.6.1 页面、locale 与 slot 注册
 
-- [ ] `packages/.../src/locale.js`：zh/en（nav `过渡动画`/`Transitions`、title、description、`fallbackFade`、`fallbackPointer`、hint）。
-- [ ] `packages/.../src/settings-page.js`：`createSettingsPage({readSettings,writeSettings,emit})`；`useState` 初值来自读取；`SegmentedControl`（id `dsh-webui-transition-fallback`、label、两 options）onChange 写 storage + emit；`useEffect` 监听 `storage` 同步；仅用 `--dsw-*` token 的内联样式，不手写分段控件。
-- [ ] `packages/.../src/browser.js`：`inject=["slots","locale"]`；`ctx.locale.register(NS,{zh,en})`；`ctx.slots.inject("settings.section", () => ctx.slots.register({name:"settings.section", id:"webui-transition", order:25, label:()=>t("nav"), locale:NS}, Page))`；`emit` 走 `ctx.emit(SETTINGS_EVENT,…)`。
-- [ ] `test/settings-page.test.mjs` + `test/settings-plugin.test.mjs`：渲染两选项/默认 fade/切换写 storage 并 emit；注册 options 的 id/order/label/locale 正确；产物 id/inject 正确。
+- [x] `packages/.../src/locale.js`：zh/en（nav `过渡动画`/`Transitions`、title、description、`fallbackFade`、`fallbackPointer`、hint）。
+- [x] `packages/.../src/settings-page.js`：`createSettingsPage({readSettings,writeSettings,emit})`；`useState` 初值来自读取；`SegmentedControl`（id `dsh-webui-transition-fallback`、label、两 options）onChange 写 storage + emit；`useEffect` 监听 `storage` 同步；仅用 `--dsw-*` token 的内联样式，不手写分段控件。
+- [x] `packages/.../src/browser.js`：`inject=["slots","locale"]`；`ctx.locale.register(NS,{zh,en})`；`ctx.slots.inject("settings.section", () => ctx.slots.register({name:"settings.section", id:"webui-transition", order:25, label:()=>t("nav"), locale:NS}, Page))`；`emit` 走 `ctx.emit(SETTINGS_EVENT,…)`。
+- [x] `test/settings-page.test.mjs` + `test/settings-plugin.test.mjs`：渲染两选项/默认 fade/切换写 storage 并 emit；注册 options 的 id/order/label/locale 正确；产物 id/inject 正确。
 - **完成判据**：`node --test test/settings-page.test.mjs test/settings-plugin.test.mjs test/bundle.test.mjs` 通过。
 
 #### 3.6.2 设置包展示元信息与文档
 
-- [ ] 设置包 `locale/{en,zh}.json` 补 `meta.title` / `meta.description`；`README.md`、`README.en.md`（用途、Settings 入口、key、默认值）。
-- [ ] 根 `README*`：效果表新增 origin-aware、回退两种模式、设置入口、「没有设置插件也运行」、localStorage key 与清空风险。
+- [x] 设置包 `locale/{en,zh}.json` 补 `meta.title` / `meta.description`；`README.md`、`README.en.md`（用途、Settings 入口、key、默认值）。
+- [x] 根 `README*`：效果表新增 origin-aware、回退两种模式、设置入口、「没有设置插件也运行」、localStorage key 与清空风险。
 - **完成判据**：`pnpm build && pnpm test` 通过；`git status` 中新增文档齐备。
 
 ### 3.7 全部验证与仓库收尾
 
 #### 3.7.1 全量测试、双包产物、文档地图
 
-- [ ] 更新 `test/helpers/env.mjs` 使 `pnpm test` 覆盖两包（node --test 自动发现）。
-- [ ] `package.json` devDeps 补 `react`/`react-dom`（仅测试）；`pnpm install` 更新 lockfile。
-- [ ] `AGENTS.md` 项目地图更新（`.agents/plan`、`packages/...`、`src/settings.js`、`src/origin.js`、`.github/workflows/ci.yml`、两个测试入口）；根 README 中英同步。
-- [ ] `COMPATIBLE_VERSION` 不改（dsh 基线未变）。
+- [x] 更新 `test/helpers/env.mjs` 使 `pnpm test` 覆盖两包（node --test 自动发现）。
+- [x] `package.json` devDeps 补 `react`/`react-dom`（仅测试）；`pnpm install` 更新 lockfile。
+- [x] `AGENTS.md` 项目地图更新（`.agents/plan`、`packages/...`、`src/settings.js`、`src/origin.js`、`.github/workflows/ci.yml`、两个测试入口）；根 README 中英同步。
+- [x] `COMPATIBLE_VERSION` 不改（dsh 基线未变）。
 - **完成判据**：`pnpm build && pnpm test` 全绿；`git diff --exit-code -- client.js packages/dsh-webui-transition-settings/client.js` 在重新 build 后无差异。
 
 ### 3.8 CI
 
 #### 3.8.1 GitHub Actions 校验流水线
 
-- [ ] 新增 `.github/workflows/ci.yml`：`on: pull_request` + `push: branches [main, "feat/**"]`；`permissions: contents: read`；`concurrency`；`ubuntu-latest` + Node 24 + pnpm（读 `packageManager`）。
-- [ ] 步骤：`pnpm install --frozen-lockfile` → `pnpm build` → `pnpm test` → `git diff --exit-code -- client.js packages/dsh-webui-transition-settings/client.js`（构建产物与提交一致）。
-- [ ] 不安装 dsh、不 publish、不写 secrets；测试只用 jsdom 与 fake loader。
-- [ ] README 中英各加一行 CI 状态/说明（可选）。
+- [x] 新增 `.github/workflows/ci.yml`：`on: pull_request` + `push: branches [main, "feat/**"]`；`permissions: contents: read`；`concurrency`；`ubuntu-latest` + Node 24 + pnpm（读 `packageManager`）。
+- [x] 步骤：`pnpm install --frozen-lockfile` → `pnpm build` → `pnpm test` → `git diff --exit-code -- client.js packages/dsh-webui-transition-settings/client.js`（构建产物与提交一致）。
+- [x] 不安装 dsh、不 publish、不写 secrets；测试只用 jsdom 与 fake loader。
+- [x] README 中英各加一行 CI 状态/说明（可选）。
 - **完成判据**：本地按 CI 步骤顺序执行通过；YAML 语法自检（如 `node -e` 解析或 `actionlint` 可用则跑）。
 
 ## 4 风险与边界（实现时注意）

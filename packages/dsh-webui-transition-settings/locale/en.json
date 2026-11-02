@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Transition settings",
+    "description": "Adds a Transitions page to Settings for choosing how the transition animation behaves when no trigger element can be inferred."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Web UI 过渡动画",
+    "description": "为 DSH Web GUI 的下拉菜单与对话框面板补上原点感知的开合过渡动画。"
+  }
+}
