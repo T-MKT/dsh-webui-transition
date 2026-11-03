@@ -27,7 +27,7 @@ import {
   resetEnvironment,
 } from "./helpers/env.mjs";
 
-const MENU_TIMING = { distancePx: -4, scaleFrom: 0.98, opacityFrom: 0 };
+const MENU_TIMING = { distancePx: 4, scaleFrom: 0.98, opacityFrom: 0 };
 const DIALOG_TIMING = { distancePx: 12, scaleFrom: 0.98, opacityFrom: 0 };
 const MASK_TIMING = { distancePx: 0, scaleFrom: 1, opacityFrom: 0 };
 

@@ -480,8 +480,19 @@ export function geometryForSource(source, surfaceRect, distancePx) {
     } else {
       const anchorBox = toBox(source.rect);
       if (!anchorBox) return null;
-      anchorX = anchorBox.left + anchorBox.width / 2;
-      anchorY = anchorBox.top + anchorBox.height / 2;
+      // 触发元素上离表面最近的边/点：把表面中心投影到触发矩形内。
+      // 触发矩形比表面宽（整行按钮）时，用触发矩形中心会把 origin 推到表面另一侧；
+      // 投影则落在面向表面的那条边上（§2.5 修正）。
+      anchorX = clampNumber(
+        box.left + box.width / 2,
+        anchorBox.left,
+        anchorBox.left + anchorBox.width,
+      );
+      anchorY = clampNumber(
+        box.top + box.height / 2,
+        anchorBox.top,
+        anchorBox.top + anchorBox.height,
+      );
     }
     if (anchorX === null || anchorY === null) return null;
 
@@ -490,6 +501,7 @@ export function geometryForSource(source, surfaceRect, distancePx) {
     const originY = normalizeZero(clampNumber(anchorY - box.top, 0, box.height));
 
     // 平移方向 = 由表面中心指向 origin，长度 = distancePx；零向量 → 不平移。
+    // distancePx 为正时入场首帧落在 origin 一侧（从触发侧起步），退场时收回 origin 一侧。
     const dx = originX - box.width / 2;
     const dy = originY - box.height / 2;
     const length = Math.sqrt(dx * dx + dy * dy);

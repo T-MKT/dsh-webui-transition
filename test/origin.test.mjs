@@ -665,16 +665,38 @@ describe("geometryForSource：原点 clamp 与平移方向", () => {
     assertClose(geometry.translateY, 8.94427190999916, "translateY");
   });
 
-  test("element 源用矩形中心作锚点", () => {
+  test("element 源锚点 = 触发矩形上离表面中心最近的点（不是矩形中心）", () => {
     const geometry = geometryForSource(
       { kind: "element", rect: makeRect(100, 0, 20, 20) },
       surfaceRect,
       12,
     );
-    assert.equal(geometry.originX, 10);
+    // 表面中心 (200,150) 投影到触发矩形 x∈[100,120]、y∈[0,20] → (120,20)
+    assert.equal(geometry.originX, 20);
     assert.equal(geometry.originY, 0);
-    assertClose(geometry.translateX, -10.489887313458453, "translateX");
-    assertClose(geometry.translateY, -5.827715174143584, "translateY");
+    assertClose(geometry.translateX, -10.175979648061055, "translateX");
+    assertClose(geometry.translateY, -6.359987280038159, "translateY");
+  });
+
+  test("宽触发矩形（整行按钮）取面向表面的那条边：origin 落在水平居中处", () => {
+    // 整行触发按钮在表面正下方，宽度远大于表面。
+    const geometry = geometryForSource(
+      { kind: "element", rect: makeRect(0, 220, 400, 40) },
+      surfaceRect,
+      4,
+    );
+    // 表面中心 (200,150) 投影到触发矩形 → (200,220)，再夹到表面 → (100,100)
+    assert.deepEqual(geometry, { originX: 100, originY: 100, translateX: 0, translateY: 4 });
+  });
+
+  test("触发源偏在表面左上方时原点取最近的角", () => {
+    const geometry = geometryForSource(
+      { kind: "element", rect: makeRect(40, 20, 40, 20) },
+      surfaceRect,
+      4,
+    );
+    // 投影 → (100,100)，origin=(0,0)：左上角，位移指向左上。
+    assert.deepEqual(geometry, { originX: 0, originY: 0, translateX: -3.5777087639996634, translateY: -1.7888543819998317 });
   });
 
   test("锚点与表面中心重合 → 零平移且归一 +0", () => {

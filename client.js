@@ -26,7 +26,7 @@
       fallbackMs: 150,
       minMs: 120,
       maxMs: 160,
-      distancePx: -4,
+      distancePx: 4,
       scaleFrom: 0.98,
       opacityFrom: 0,
       easing: null,
@@ -41,7 +41,7 @@
       fallbackMs: 150,
       minMs: 120,
       maxMs: 160,
-      distancePx: -4,
+      distancePx: 4,
       scaleFrom: 0.98,
       opacityFrom: 0,
       easing: null,
@@ -888,8 +888,16 @@
       } else {
         const anchorBox = toBox(source.rect);
         if (!anchorBox) return null;
-        anchorX = anchorBox.left + anchorBox.width / 2;
-        anchorY = anchorBox.top + anchorBox.height / 2;
+        anchorX = clampNumber(
+          box.left + box.width / 2,
+          anchorBox.left,
+          anchorBox.left + anchorBox.width
+        );
+        anchorY = clampNumber(
+          box.top + box.height / 2,
+          anchorBox.top,
+          anchorBox.top + anchorBox.height
+        );
       }
       if (anchorX === null || anchorY === null) return null;
       const originX = normalizeZero(clampNumber(anchorX - box.left, 0, box.width));

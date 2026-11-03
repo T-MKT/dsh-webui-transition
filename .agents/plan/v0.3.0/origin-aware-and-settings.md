@@ -74,7 +74,7 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 | --- | --- | --- |
 | `src/settings.js` | 新增 | 主包侧设置契约：`SETTINGS_KEY`/`SETTINGS_EVENT`/`FALLBACK_MODES`/`DEFAULT_SETTINGS`、`normalizeSettings`、`readSettings`、`writeSettings`；所有 localStorage 访问 try/catch。 |
 | `src/origin.js` | 新增 | `createInteractionTracker`（window capture 记录 pointer/key，解析触发源）与 `geometryForSource`（源 → `{originX,originY,translateX,translateY}`）。 |
-| `src/defs.js` | 修改 | `SURFACE_DEFS.dialog.scaleFrom: 0.98`；其余策略不变。 |
+| `src/defs.js` | 修改 | `SURFACE_DEFS.dialog.scaleFrom: 0.98`；`menu`/`listbox.distancePx: 4`（正值 = 入场首帧落在触发侧）；其余策略不变。 |
 | `src/frames.js` | 修改 | `geometryKeyframesFor` 接受 geometry：写 `transformOrigin`/方向平移/缩放；geometry 为 null 时不出几何帧；非 splitFade 表面 geometry null 时只出 opacity。 |
 | `src/runtime.js` | 修改 | 入场解析 source→geometry、按 `fallbackMode` 回退、写 geometry 缓存；退场幽灵复用/回退解析；dispose 清理。 |
 | `src/browser.js` | 修改 | 构造 tracker、读取 settings、订阅 Cordis 事件与 `storage`；把 `origin`/`fallbackMode` 传给 runtime。 |
@@ -132,10 +132,15 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 **`geometryForSource(source, surfaceRect, distancePx)`**：
 
 - `surfaceRect` 宽/高任一 ≤0 → `null`。
-- `anchorPoint`：element 用 rect 中心；point 用坐标。
+- `anchorPoint`：element 用**触发矩形上离表面中心最近的点**（把表面中心夹到触发矩形内）；point 用坐标。宽度远大于表面的整行按钮因此取「面向表面的那条边」，而不是矩形中心。
 - `originX = clamp(anchorPoint.x - rect.left, 0, width)`，`originY = clamp(anchorPoint.y - rect.top, 0, height)`。
-- `translate = unit(originPointLocal - surfaceCenterLocal) * distancePx`；零向量 → `{0,0}`。
+- `translate = unit(originPointLocal - surfaceCenterLocal) * distancePx`；零向量 → `{0,0}`。`distancePx` 取正值（menu/listbox 4、dialog 12）表示入场首帧沿 origin 方向偏移、即**从触发侧起步**，退场镜像收回触发侧；0 = 不做方向位移。
 - 返回 `{ originX, originY, translateX, translateY }`（像素，origin 可等于 0/width/height）。
+
+> 复查修正（v0.3.0 后）：首版实现用「触发矩形**中心**」作锚点、并沿用 v0.1 的 `distancePx: -4`，
+> 于是（1）整行宽触发按钮会把 origin 推到表面另一侧；（2）入场首帧被推向 origin 反方向，视觉上
+> 「从错误的对角弹出」。现改为「表面中心投影到触发矩形」取最近边/点，`menu`/`listbox.distancePx`
+> 取正值 `4`（入场从触发侧起步、退场收回触发侧）。dialog 的 `12` 本就是该约定，保持不变。
 
 ### 2.6 设置契约（跨包冻结）
 

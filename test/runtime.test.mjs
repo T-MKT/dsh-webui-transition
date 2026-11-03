@@ -41,10 +41,10 @@ import { createSurfaceTracker } from "../src/tracker.js";
 // ---------------------------------------------------------------------------
 
 const MENU_RECT = { left: 100, top: 100, width: 200, height: 100 };
-// 触发源在菜单正上方：origin=(100,0)，translate=(0,4)（distancePx=-4）。
+// 触发源在菜单正上方：origin=(100,0)，translate=(0,-4)（distancePx=4，首帧落在触发侧）。
 const MENU_SOURCE = { kind: "element", rect: { left: 150, top: 60, width: 100, height: 30 } };
 const MENU_ORIGIN = "100px 0px";
-const MENU_TRANSLATE = "0px 4px";
+const MENU_TRANSLATE = "0px -4px";
 
 const DIALOG_RECT = { left: 100, top: 100, width: 400, height: 300 };
 // 触发源在对话框正上方：origin=(200,0)，translate=(0,-12)（distancePx=12）。

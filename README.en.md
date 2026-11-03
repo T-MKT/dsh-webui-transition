@@ -13,7 +13,7 @@ It only takes over the two surfaces the host does not animate, covering both ent
 
 | Surface | Semantic selector | Enter | Exit |
 | --- | --- | --- | --- |
-| Dropdown menus (including the model menu inside Settings) | `role="menu"` | Scales from the trigger's nearest edge/point (`.98`) + displacement toward the trigger, about 150ms by default | Reuses the entry origin and retracts toward the trigger |
+| Dropdown menus (including the model menu inside Settings) | `role="menu"` | Scales from the trigger's nearest edge/point (`.98`) + starts `4px` from the trigger side, about 150ms by default | Reuses the entry origin and retracts toward the trigger |
 | Settings panel and `role="dialog"` popover panels (such as the Agent Team board and the context usage panel) | `role="dialog"` (optionally with a mask) | Mask fades in (about 180ms); panel scales from the trigger (`.98`) + `12px` directional displacement (about 220ms) | Mirrored |
 
 - **Origin-aware**: the trigger is inferred in priority order — DOM adjacency (submenu / non-portal wrapper) → `aria-controls` → `[aria-expanded="true"][aria-haspopup]` (24px adjacency gate + 1400px distance cap) → most recent pointer target (within 2.5s) → keyboard focus. When nothing can be inferred, the configured fallback applies.
