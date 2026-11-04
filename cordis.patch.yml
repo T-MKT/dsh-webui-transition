@@ -1,3 +1,5 @@
 - insert:
     - id: dsh-webui-transition
       name: "@tak1208/dsh-webui-transition"
+    - id: dsh-webui-transition-settings
+      name: "@tak1208/dsh-webui-transition-settings"

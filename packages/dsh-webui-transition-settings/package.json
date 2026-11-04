@@ -1,0 +1,51 @@
+{
+  "name": "@tak1208/dsh-webui-transition-settings",
+  "version": "0.3.0",
+  "description": "DSH Web GUI 扩展：过渡动画设置页（Settings → 过渡动画），为 @tak1208/dsh-webui-transition 提供无锚点回退方式选择。",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "webui",
+    "transition",
+    "settings"
+  ],
+  "homepage": "https://github.com/T-MKT/dsh-webui-transition#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/T-MKT/dsh-webui-transition.git",
+    "directory": "packages/dsh-webui-transition-settings"
+  },
+  "bugs": {
+    "url": "https://github.com/T-MKT/dsh-webui-transition/issues"
+  },
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "locale/*.json",
+    "README.md",
+    "README.en.md"
+  ],
+  "author": "tak1208",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "dsh": ">=0.2.2-alpha.2 <0.3.0"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  }
+}

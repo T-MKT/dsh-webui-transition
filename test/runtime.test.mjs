@@ -1,12 +1,14 @@
 /**
- * test/runtime.test.mjs — createTransitionRuntime 单测（§5.5）。
+ * test/runtime.test.mjs — createTransitionRuntime 单测（§5.5 + v0.3.0 §3.4）。
  *
- * 依据：.plan/v0.2.0/plan-b-rewrite.md §3.7（模块设计）、§4（冻结签名）、§5.5（runtime 测试要点）。
+ * 依据：.plan/v0.2.0/plan-b-rewrite.md §3.7（模块设计）、§4（冻结签名）、§5.5（runtime 测试要点）；
+ * .agents/plan/v0.3.0/origin-aware-and-settings.md §3.4（origin 接线与回退）。
  *
  * 装配方式：
  * - jsdom / token / fake animate / fake matchMedia / 可控 rAF 全部来自 test/helpers/env.mjs；
- * - 依赖真实 tracker / gate / frames，只注入可控 requestFrame / cancelFrame / matchMedia /
- *   computedStyle，不依赖真实帧与定时器。
+ * - 依赖真实 tracker / gate / frames / origin，只注入可控 requestFrame / cancelFrame /
+ *   matchMedia / computedStyle / origin / fallbackMode，不依赖真实帧与定时器；
+ * - jsdom 的 getBoundingClientRect 返回全 0，测试用 stubRect 给表面与触发源注入矩形。
  */
 
 import { after, afterEach, beforeEach, describe, test } from "node:test";
@@ -35,13 +37,63 @@ import { createTransitionRuntime } from "../src/runtime.js";
 import { createSurfaceTracker } from "../src/tracker.js";
 
 // ---------------------------------------------------------------------------
+// 矩形 / fake origin 装配
+// ---------------------------------------------------------------------------
+
+const MENU_RECT = { left: 100, top: 100, width: 200, height: 100 };
+// 触发源在菜单正上方：origin=(100,0)，translate=(0,-4)（distancePx=4，首帧落在触发侧）。
+const MENU_SOURCE = { kind: "element", rect: { left: 150, top: 60, width: 100, height: 30 } };
+const MENU_ORIGIN = "100px 0px";
+const MENU_TRANSLATE = "0px -4px";
+
+const DIALOG_RECT = { left: 100, top: 100, width: 400, height: 300 };
+// 触发源在对话框正上方：origin=(200,0)，translate=(0,-12)（distancePx=12）。
+const DIALOG_SOURCE = { kind: "element", rect: { left: 250, top: 60, width: 100, height: 30 } };
+const DIALOG_ORIGIN = "200px 0px";
+const DIALOG_TRANSLATE = "0px -12px";
+
+function stubRect(element, rect) {
+  element.getBoundingClientRect = () => ({
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+    right: rect.left + rect.width,
+    bottom: rect.top + rect.height,
+    x: rect.left,
+    y: rect.top,
+  });
+  return element;
+}
+
+function createFakeOrigin(options = {}) {
+  const state = {
+    source: options.source === undefined ? null : options.source,
+    point: options.point === undefined ? null : options.point,
+    resolveCalls: 0,
+    pointCalls: 0,
+  };
+  return {
+    state,
+    resolve() {
+      state.resolveCalls += 1;
+      return state.source;
+    },
+    lastPointerPoint() {
+      state.pointCalls += 1;
+      return state.point;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 装配 / 清理
 // ---------------------------------------------------------------------------
 
 const activeHarnesses = [];
 
 /**
- * 装配一个 runtime：真实 policy / tracker / gate，注入可控帧调度器与 matchMedia 桩。
+ * 装配一个 runtime：真实 policy / tracker / gate / origin，注入可控帧调度器与 matchMedia 桩。
  */
 function createHarness(overrides = {}) {
   const scheduler = createFrameScheduler();
@@ -50,6 +102,9 @@ function createHarness(overrides = {}) {
   const policy = createPolicy({ matchMedia: media.matchMedia, computedStyle: style });
   const tracker = createSurfaceTracker();
   const gate = createGate({ computedStyle: style });
+  const origin = overrides.origin === undefined ? createFakeOrigin() : overrides.origin;
+  const fallbackMode =
+    typeof overrides.fallbackMode === "function" ? overrides.fallbackMode : () => "fade";
   const runtime = createTransitionRuntime({
     root: document,
     policy,
@@ -59,6 +114,8 @@ function createHarness(overrides = {}) {
     animator: overrides.animator,
     requestFrame: scheduler.requestFrame,
     cancelFrame: scheduler.cancelFrame,
+    origin,
+    fallbackMode,
   });
   const harness = {
     scheduler,
@@ -67,6 +124,7 @@ function createHarness(overrides = {}) {
     tracker,
     gate,
     runtime,
+    origin,
     stop: runtime.start(),
     disposed: false,
   };
@@ -115,12 +173,14 @@ after(() => {
 describe("runtime：观察与入场", () => {
   test("初始扫描：start() 前已存在的 menu 不播入场，新增 menu 播入场", async () => {
     const existing = buildMenu();
+    stubRect(existing, MENU_RECT);
     document.body.appendChild(existing);
 
-    const harness = createHarness();
+    const harness = createHarness({ origin: createFakeOrigin({ source: MENU_SOURCE }) });
     assert.equal(animateCalls.length, 0, "启动前已存在的表面不应播入场");
 
     const added = buildMenu();
+    stubRect(added, MENU_RECT);
     document.body.appendChild(added);
     await nextTask();
     flushAllFrames(harness.scheduler);
@@ -136,9 +196,10 @@ describe("runtime：观察与入场", () => {
     );
   });
 
-  test("mount 动画：表面几何 + 直接子级 opacity，duration/easing/fill 来自 policy", async () => {
-    const harness = createHarness();
+  test("mount 动画：表面原点几何 + 直接子级 opacity，duration/easing/fill 来自 policy", async () => {
+    const harness = createHarness({ origin: createFakeOrigin({ source: MENU_SOURCE }) });
     const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
     document.body.appendChild(menu);
     await nextTask();
     flushAllFrames(harness.scheduler);
@@ -157,9 +218,11 @@ describe("runtime：观察与入场", () => {
     );
     assert.equal(surfaceCall.options.fill, "both", "动画期间用 fill:both 维持首尾帧");
 
-    // 独立 transform 支持（jsdom CSS.supports 为 true）：上浮 -4px + 从 .98 放大。
-    assert.equal(surfaceCall.keyframes[0].translate, "0 -4px", "表面从 -4px 上浮");
+    // 原点感知：transform-origin 落在触发源最近边，位移方向由 origin 几何决定。
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN, "transform-origin 来自触发源");
+    assert.equal(surfaceCall.keyframes[0].translate, MENU_TRANSLATE, "位移来自 origin 几何");
     assert.equal(Number(surfaceCall.keyframes[0].scale), 0.98, "表面从 .98 放大");
+    assert.equal(surfaceCall.keyframes[1].translate, "0 0", "末帧回到原位");
     for (const frame of surfaceCall.keyframes) {
       assert.equal(frame.opacity, undefined, "menu 表面不写 opacity（透明度下沉到子级）");
     }
@@ -176,8 +239,9 @@ describe("runtime：观察与入场", () => {
   });
 
   test("入场动画 settle 后 cancel 释放 fill（避免长期充当 backdrop-root）", async () => {
-    const harness = createHarness();
+    const harness = createHarness({ origin: createFakeOrigin({ source: MENU_SOURCE }) });
     const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
     document.body.appendChild(menu);
     await nextTask();
     flushAllFrames(harness.scheduler);
@@ -203,8 +267,9 @@ describe("runtime：观察与入场", () => {
 
 describe("runtime：去重与门卫重试", () => {
   test("门卫拒绝后重试不被去重抑制：不可见 mount 被拒，恢复可见后仍能播入场", async () => {
-    const harness = createHarness();
+    const harness = createHarness({ origin: createFakeOrigin({ source: MENU_SOURCE }) });
     const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
     menu.style.display = "none";
     document.body.appendChild(menu);
     await nextTask();
@@ -231,8 +296,9 @@ describe("runtime：去重与门卫重试", () => {
   });
 
   test("同帧去重：同一帧重复 enqueue 同一 intent 只产生一组动画", async () => {
-    const harness = createHarness();
+    const harness = createHarness({ origin: createFakeOrigin({ source: MENU_SOURCE }) });
     const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
     document.body.appendChild(menu);
     // 等观察器把 mount intent 入队（帧尚未 flush）。
     await nextTask();
@@ -267,10 +333,11 @@ describe("runtime：去重与门卫重试", () => {
 
 describe("runtime：reduced-motion 热切换", () => {
   test("动画在播时媒体查询变 true：在播动画被 cancel、退场幽灵被移除", async () => {
-    const harness = createHarness();
+    const harness = createHarness({ origin: createFakeOrigin({ source: MENU_SOURCE }) });
     const stage = document.createElement("div");
     document.body.appendChild(stage);
     const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
     stage.appendChild(menu);
     await nextTask();
     flushAllFrames(harness.scheduler);
@@ -299,6 +366,7 @@ describe("runtime：reduced-motion 热切换", () => {
     harness.media.setMatches(false);
     resetAnimationLog();
     const next = buildMenu();
+    stubRect(next, MENU_RECT);
     document.body.appendChild(next);
     await nextTask();
     flushAllFrames(harness.scheduler);
@@ -315,10 +383,11 @@ describe("runtime：reduced-motion 热切换", () => {
 
 describe("runtime：退场幽灵", () => {
   test("移除 menu 产生幽灵：克隆、退场动画、settle 后移除，且保留 backdrop-filter", async () => {
-    const harness = createHarness();
+    const harness = createHarness({ origin: createFakeOrigin({ source: MENU_SOURCE }) });
     const stage = document.createElement("div");
     document.body.appendChild(stage);
     const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
     menu.id = "runtime-menu";
     menu.style.boxShadow = "0 8px 24px rgba(0, 0, 0, 0.2)";
     const material = menu.querySelector(".material");
@@ -358,6 +427,10 @@ describe("runtime：退场幽灵", () => {
     for (const frame of surfaceCall.keyframes) {
       assert.equal(frame.opacity, undefined, "menu 幽灵根同样不写 opacity");
     }
+    // 退场复用入场缓存的 origin 几何（镜像）。
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN, "幽灵复用入场 origin");
+    assert.equal(surfaceCall.keyframes[0].translate, "0 0", "退场从原位开始");
+    assert.equal(surfaceCall.keyframes[1].translate, MENU_TRANSLATE, "退场朝触发源收回");
     assert.equal(surfaceCall.keyframes[0].boxShadow, naturalShadow, "阴影从计算值开始淡出");
 
     const ghostChildren = elementChildren(ghost);
@@ -383,10 +456,11 @@ describe("runtime：退场幽灵", () => {
 
 describe("runtime：dispose", () => {
   test("dispose() 断开 observer、移除幽灵、清空动画，后续 mutation 不再动画", async () => {
-    const harness = createHarness();
+    const harness = createHarness({ origin: createFakeOrigin({ source: MENU_SOURCE }) });
     const stage = document.createElement("div");
     document.body.appendChild(stage);
     const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
     stage.appendChild(menu);
     await nextTask();
     flushAllFrames(harness.scheduler);
@@ -412,10 +486,109 @@ describe("runtime：dispose", () => {
 
     const callsBefore = animateCalls.length;
     const late = buildMenu();
+    stubRect(late, MENU_RECT);
     document.body.appendChild(late);
     await nextTask();
     flushAllFrames(harness.scheduler);
     assert.equal(animateCalls.length, callsBefore, "dispose 后 observer 已断开，不再产生动画");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v0.3.0 原点感知：入场解析 / 回退 / 幽灵复用
+// ---------------------------------------------------------------------------
+
+describe("runtime：原点感知与回退", () => {
+  test("origin 入场：使用解析出的触发源几何（transform-origin + 方向平移）", async () => {
+    const harness = createHarness({ origin: createFakeOrigin({ source: MENU_SOURCE }) });
+    const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
+    document.body.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const surfaceCall = animateCalls.find((call) => call.element === menu);
+    assert.ok(surfaceCall, "应播表面几何动画");
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN);
+    assert.equal(surfaceCall.keyframes[0].translate, MENU_TRANSLATE);
+    assert.equal(harness.origin.state.resolveCalls > 0, true, "应调用 origin.resolve");
+  });
+
+  test("无 origin 时默认 fade：menu 只有子级 opacity，无表面几何帧", async () => {
+    const harness = createHarness({ origin: null });
+    const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
+    document.body.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    assert.equal(
+      animateCalls.filter((call) => call.element === menu).length,
+      0,
+      "无 origin 时表面不做几何动画",
+    );
+    const children = elementChildren(menu);
+    const childCalls = animateCalls.filter((call) => children.includes(call.element));
+    assert.equal(childCalls.length, children.length, "子级仍淡入");
+  });
+
+  test("fade 回退：解析不到触发源且 fallbackMode=fade → 仅淡入", async () => {
+    const harness = createHarness({
+      origin: createFakeOrigin({ source: null }),
+      fallbackMode: () => "fade",
+    });
+    const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
+    document.body.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    assert.equal(animateCalls.filter((call) => call.element === menu).length, 0);
+    assert.equal(harness.origin.state.pointCalls, 0, "fade 模式不应读取指针点");
+  });
+
+  test("pointer 回退：解析不到触发源且 fallbackMode=pointer → 用最近指针点生成几何", async () => {
+    const harness = createHarness({
+      origin: createFakeOrigin({ source: null, point: { x: 200, y: 75 } }),
+      fallbackMode: () => "pointer",
+    });
+    const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
+    document.body.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const surfaceCall = animateCalls.find((call) => call.element === menu);
+    assert.ok(surfaceCall, "pointer 回退应播表面几何动画");
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN);
+    assert.equal(surfaceCall.keyframes[0].translate, MENU_TRANSLATE);
+    assert.equal(harness.origin.state.pointCalls > 0, true, "应读取最近指针点");
+  });
+
+  test("退场幽灵复用入场 origin：入场后触发源变化也不影响退场几何", async () => {
+    const origin = createFakeOrigin({ source: MENU_SOURCE });
+    const harness = createHarness({ origin });
+    const stage = document.createElement("div");
+    document.body.appendChild(stage);
+    const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
+    stage.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+    await settleAnimations();
+    resetAnimationLog();
+
+    // 入场后把触发源换到别处：退场必须复用入场缓存，而不是重新解析。
+    origin.state.source = { kind: "element", rect: { left: 0, top: 0, width: 10, height: 10 } };
+    menu.remove();
+    await nextTask();
+
+    const ghost = document.querySelector("[data-dsh-transition-ghost]");
+    assert.ok(ghost, "应产生退场幽灵");
+    const surfaceCall = animateCalls.find((call) => call.element === ghost);
+    assert.ok(surfaceCall, "幽灵应播退场动画");
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN, "复用入场 origin");
+    assert.equal(surfaceCall.keyframes[1].translate, MENU_TRANSLATE, "复用入场方向平移");
   });
 });
 
@@ -427,8 +600,12 @@ const GLASS_SHADOW = "rgb(0, 0, 0) 0px 8px 24px";
 
 describe("runtime：伪元素玻璃", () => {
   test("入场：表面几何 + 子级 opacity + 伪元素 pseudoElement 动画，表面无 opacity", async () => {
-    const harness = createHarness({ computedStyle: pseudoGlassComputedStyle() });
+    const harness = createHarness({
+      computedStyle: pseudoGlassComputedStyle(),
+      origin: createFakeOrigin({ source: DIALOG_SOURCE }),
+    });
     const panel = buildGlassPanel();
+    stubRect(panel, DIALOG_RECT);
     panel.style.boxShadow = GLASS_SHADOW;
     document.body.appendChild(panel);
     await nextTask();
@@ -439,7 +616,9 @@ describe("runtime：伪元素玻璃", () => {
 
     const geometryCall = panelCalls.find((call) => !call.options.pseudoElement);
     assert.ok(geometryCall, "应有表面几何动画");
-    assert.equal(geometryCall.keyframes[0].translate, "0 12px");
+    assert.equal(geometryCall.keyframes[0].transformOrigin, DIALOG_ORIGIN);
+    assert.equal(geometryCall.keyframes[0].translate, DIALOG_TRANSLATE);
+    assert.equal(Number(geometryCall.keyframes[0].scale), 0.98);
     assert.equal(geometryCall.keyframes[0].boxShadow, "none");
     for (const frame of geometryCall.keyframes) {
       assert.equal("opacity" in frame, false, "伪元素玻璃表面不得有 opacity 帧");
@@ -476,8 +655,10 @@ describe("runtime：伪元素玻璃", () => {
     const harness = createHarness({
       computedStyle: pseudoGlassComputedStyle(),
       animator: ignoringAnimator,
+      origin: createFakeOrigin({ source: DIALOG_SOURCE }),
     });
     const panel = buildGlassPanel();
+    stubRect(panel, DIALOG_RECT);
     panel.style.boxShadow = GLASS_SHADOW;
     document.body.appendChild(panel);
     await nextTask();
@@ -503,10 +684,14 @@ describe("runtime：伪元素玻璃", () => {
   });
 
   test("退场幽灵：克隆体的伪元素同样淡出，settle 后移除幽灵", async () => {
-    const harness = createHarness({ computedStyle: pseudoGlassComputedStyle() });
+    const harness = createHarness({
+      computedStyle: pseudoGlassComputedStyle(),
+      origin: createFakeOrigin({ source: DIALOG_SOURCE }),
+    });
     const stage = document.createElement("div");
     document.body.appendChild(stage);
     const panel = buildGlassPanel();
+    stubRect(panel, DIALOG_RECT);
     panel.style.boxShadow = GLASS_SHADOW;
     stage.appendChild(panel);
     await nextTask();
@@ -530,6 +715,7 @@ describe("runtime：伪元素玻璃", () => {
 
     const geometryCall = ghostCalls.find((call) => !call.options.pseudoElement);
     assert.ok(geometryCall, "幽灵表面应播几何/阴影退场动画");
+    assert.equal(geometryCall.keyframes[0].transformOrigin, DIALOG_ORIGIN, "幽灵复用入场 origin");
     for (const frame of geometryCall.keyframes) {
       assert.equal("opacity" in frame, false, "幽灵宿主不得有 opacity 帧");
     }

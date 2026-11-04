@@ -104,13 +104,13 @@ describe("timing：fallback / clamp / 几何起点", () => {
   test("返回 SURFACE_DEFS 冻结的位移 / 缩放 / 透明度起点", () => {
     const { policy } = createPolicyHarness();
     const menu = policy.timing("menu");
-    assert.equal(menu.distancePx, -4);
+    assert.equal(menu.distancePx, 4);
     assert.equal(menu.scaleFrom, 0.98);
     assert.equal(menu.opacityFrom, 0);
-    assert.equal(policy.timing("listbox").distancePx, -4);
+    assert.equal(policy.timing("listbox").distancePx, 4);
     const dialog = policy.timing("dialog");
     assert.equal(dialog.distancePx, 12);
-    assert.equal(dialog.scaleFrom, 1);
+    assert.equal(dialog.scaleFrom, 0.98);
     assert.equal(dialog.opacityFrom, 0);
     const mask = policy.timing("mask");
     assert.equal(mask.distancePx, 0);

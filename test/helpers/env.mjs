@@ -174,32 +174,48 @@ export async function settleAnimations() {
 // 4. fake window.__ModuleLoader__（bundle 产物冒烟）
 // ---------------------------------------------------------------------------
 
-let capturedRegistration = null;
+let capturedRegistrations = [];
 
 window.__ModuleLoader__ = {
   load(record) {
-    capturedRegistration = record;
+    capturedRegistrations.push(record);
   },
 };
 
 export function resetLoaderCapture() {
-  capturedRegistration = null;
+  capturedRegistrations = [];
 }
 
-/** 动态 import 一个 client 产物，返回 fake loader 捕获的注册记录。 */
+/** 动态 import 一个 client 产物，返回 fake loader 捕获的第一条注册记录。 */
 export async function importBundle(specifier) {
-  capturedRegistration = null;
+  capturedRegistrations = [];
   await import(specifier);
-  return capturedRegistration;
+  return capturedRegistrations[0] ?? null;
 }
 
-/** 从注册记录材料化 exports：factory 必须是自包含的（require 抛错兜底）。 */
-export function materializeBundle(registration) {
+/** 动态 import 一个 client 产物，返回 fake loader 捕获的全部注册记录。 */
+export async function importBundles(specifier) {
+  capturedRegistrations = [];
+  await import(specifier);
+  return capturedRegistrations.slice();
+}
+
+/**
+ * 从注册记录材料化 exports。
+ * @param {object} registration - fake loader 捕获的 `{ id, factory }`。
+ * @param {(specifier: string) => unknown} [requireFn] - factory 的 require；
+ *   缺省时抛错（主插件产物必须自包含），设置插件测试可注入 baseline 模块桩。
+ */
+export function materializeBundle(registration, requireFn) {
   if (!registration) throw new Error("产物必须调用 window.__ModuleLoader__.load 注册");
   if (typeof registration.factory !== "function") throw new Error("注册记录必须带 factory");
-  return registration.factory(() => {
-    throw new Error("unexpected require：client 产物必须自包含");
-  });
+  const require =
+    typeof requireFn === "function"
+      ? requireFn
+      : () => {
+          throw new Error("unexpected require：client 产物必须自包含");
+        };
+  return registration.factory(require);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,6 +226,51 @@ export function nextTask() {
   return new Promise((resolve) => {
     setTimeout(resolve, 0);
   });
+}
+
+/**
+ * 内存版 Storage 桩（localStorage 契约测试用）。
+ * @param {Record<string, string>} [initial]
+ */
+export function createFakeStorage(initial = {}) {
+  const map = new Map(Object.entries(initial));
+  return {
+    getItem(key) {
+      return map.has(key) ? map.get(key) : null;
+    },
+    setItem(key, value) {
+      map.set(key, String(value));
+    },
+    removeItem(key) {
+      map.delete(key);
+    },
+    clear() {
+      map.clear();
+    },
+    key(index) {
+      return Array.from(map.keys())[index] ?? null;
+    },
+    get length() {
+      return map.size;
+    },
+  };
+}
+
+/** 所有访问都抛异常的 Storage 桩（验证 try/catch 兜底）。 */
+export function createThrowingStorage() {
+  const fail = () => {
+    throw new Error("storage unavailable");
+  };
+  return {
+    getItem: fail,
+    setItem: fail,
+    removeItem: fail,
+    clear: fail,
+    key: fail,
+    get length() {
+      return fail();
+    },
+  };
 }
 
 /** 可控 rAF：入队后由测试同步 flush，避免依赖真实帧/定时器。 */

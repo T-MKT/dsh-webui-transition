@@ -26,7 +26,7 @@
       fallbackMs: 150,
       minMs: 120,
       maxMs: 160,
-      distancePx: -4,
+      distancePx: 4,
       scaleFrom: 0.98,
       opacityFrom: 0,
       easing: null,
@@ -41,7 +41,7 @@
       fallbackMs: 150,
       minMs: 120,
       maxMs: 160,
-      distancePx: -4,
+      distancePx: 4,
       scaleFrom: 0.98,
       opacityFrom: 0,
       easing: null,
@@ -55,7 +55,7 @@
       minMs: 160,
       maxMs: 240,
       distancePx: 12,
-      scaleFrom: 1,
+      scaleFrom: 0.98,
       opacityFrom: 0,
       easing: DIALOG_EASING,
       splitFade: false,
@@ -209,7 +209,7 @@
   function surfaceDefFor(kind) {
     return SURFACE_DEFS[kind] || SURFACE_DEFS.menu;
   }
-  function geometryFor(def, timing) {
+  function geometryValuesFor(def, timing) {
     const source = timing && typeof timing === "object" ? timing : {};
     return {
       distancePx: Number.isFinite(source.distancePx) ? source.distancePx : def.distancePx,
@@ -217,26 +217,33 @@
       opacityFrom: Number.isFinite(source.opacityFrom) ? source.opacityFrom : def.opacityFrom
     };
   }
-  function geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out) {
+  function px(value) {
+    return String(value) + "px";
+  }
+  function originValue(geometry) {
+    return px(geometry.originX) + " " + px(geometry.originY);
+  }
+  function translateValue(geometry) {
+    return px(geometry.translateX) + " " + px(geometry.translateY);
+  }
+  function geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out, geometry) {
+    if (!geometry || !independentTransforms) return [];
     const def = surfaceDefFor(kind);
-    const geometry = geometryFor(def, timing);
-    const first = {};
-    const last = {};
-    if (independentTransforms) {
-      if (geometry.distancePx !== 0) {
-        first.translate = out ? "0 0" : "0 " + geometry.distancePx + "px";
-        last.translate = out ? "0 " + geometry.distancePx + "px" : "0 0";
-      }
-      if (geometry.scaleFrom !== 1) {
-        first.scale = out ? "1" : String(geometry.scaleFrom);
-        last.scale = out ? String(geometry.scaleFrom) : "1";
-      }
+    const values = geometryValuesFor(def, timing);
+    const origin = originValue(geometry);
+    const first = { transformOrigin: origin };
+    const last = { transformOrigin: origin };
+    first.translate = out ? "0 0" : translateValue(geometry);
+    last.translate = out ? translateValue(geometry) : "0 0";
+    if (values.scaleFrom !== 1) {
+      first.scale = out ? "1" : String(values.scaleFrom);
+      last.scale = out ? String(values.scaleFrom) : "1";
     }
     if (boxShadow) {
       first.boxShadow = out ? boxShadow : "none";
       last.boxShadow = out ? "none" : boxShadow;
     }
-    return Object.keys(first).length > 0 ? [first, last] : [];
+    return [first, last];
   }
   function directElementChildren(element) {
     if (!isElement(element) || !element.childNodes) return [];
@@ -298,31 +305,57 @@
     if (direction === "out") return [{ opacity: value }, { opacity: 0 }];
     return [{ opacity: 0 }, { opacity: value }];
   }
-  function keyframesFor(kind, timing, independentTransforms, boxShadow = null) {
+  function keyframesFor(kind, timing, independentTransforms, boxShadow = null, geometry = null) {
     const def = surfaceDefFor(kind);
     if (def.splitFade) {
-      return geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, false);
+      return geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, false, geometry);
     }
-    const geometry = geometryFor(def, timing);
-    const first = { opacity: geometry.opacityFrom };
+    const values = geometryValuesFor(def, timing);
+    const first = { opacity: values.opacityFrom };
     const last = { opacity: 1 };
-    if (independentTransforms && geometry.distancePx !== 0) {
-      first.translate = "0 " + geometry.distancePx + "px";
-      last.translate = "0 0";
+    if (geometry) {
+      if (independentTransforms) {
+        const origin = originValue(geometry);
+        first.transformOrigin = origin;
+        last.transformOrigin = origin;
+        first.translate = translateValue(geometry);
+        last.translate = "0 0";
+        if (values.scaleFrom !== 1) {
+          first.scale = String(values.scaleFrom);
+          last.scale = "1";
+        }
+      }
+      if (boxShadow) {
+        first.boxShadow = "none";
+        last.boxShadow = boxShadow;
+      }
     }
     return [first, last];
   }
-  function exitKeyframesFor(kind, timing, independentTransforms, boxShadow = null) {
+  function exitKeyframesFor(kind, timing, independentTransforms, boxShadow = null, geometry = null) {
     const def = surfaceDefFor(kind);
     if (def.splitFade) {
-      return geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, true);
+      return geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, true, geometry);
     }
-    const geometry = geometryFor(def, timing);
+    const values = geometryValuesFor(def, timing);
     const first = { opacity: 1 };
-    const last = { opacity: geometry.opacityFrom };
-    if (independentTransforms && geometry.distancePx !== 0) {
-      first.translate = "0 0";
-      last.translate = "0 " + geometry.distancePx + "px";
+    const last = { opacity: values.opacityFrom };
+    if (geometry) {
+      if (independentTransforms) {
+        const origin = originValue(geometry);
+        first.transformOrigin = origin;
+        last.transformOrigin = origin;
+        first.translate = "0 0";
+        last.translate = translateValue(geometry);
+        if (values.scaleFrom !== 1) {
+          first.scale = "1";
+          last.scale = String(values.scaleFrom);
+        }
+      }
+      if (boxShadow) {
+        first.boxShadow = boxShadow;
+        last.boxShadow = "none";
+      }
     }
     return [first, last];
   }
@@ -331,18 +364,19 @@
     const def = surfaceDefFor(kind);
     const out = direction === "out";
     const computedStyle = options && typeof options.computedStyle === "function" ? options.computedStyle : defaultComputedStyle;
+    const geometry = options && options.geometry ? options.geometry : null;
     const timing = {
       distancePx: def.distancePx,
       scaleFrom: def.scaleFrom,
       opacityFrom: def.opacityFrom
     };
     const pseudoGlass = def.splitFade ? null : pseudoGlassFor(surface, computedStyle);
-    const boxShadow = def.animateShadow || pseudoGlass !== null ? naturalBoxShadow(surface, computedStyle) : null;
+    const boxShadow = geometry && (def.animateShadow || pseudoGlass !== null) ? naturalBoxShadow(surface, computedStyle) : null;
     if (!def.splitFade && pseudoGlass === null) {
-      const surfaceFrames2 = out ? exitKeyframesFor(kind, timing, independentTransforms, boxShadow) : keyframesFor(kind, timing, independentTransforms, boxShadow);
+      const surfaceFrames2 = out ? exitKeyframesFor(kind, timing, independentTransforms, boxShadow, geometry) : keyframesFor(kind, timing, independentTransforms, boxShadow, geometry);
       return surfaceFrames2.length > 0 ? [{ element: surface, keyframes: surfaceFrames2 }] : [];
     }
-    const surfaceFrames = geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out);
+    const surfaceFrames = geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out, geometry);
     const children = directElementChildren(surface);
     const specs = [];
     if (surfaceFrames.length > 0) specs.push({ element: surface, keyframes: surfaceFrames });
@@ -484,6 +518,400 @@
       return true;
     }
     return { canAnimate };
+  }
+
+  // src/origin.js
+  var FRESH_MS = 2500;
+  var ADJACENT_GAP_PX = 24;
+  var MAX_CENTER_DISTANCE_PX = 1400;
+  var TRIGGER_SELECTOR = 'button, a[href], [role="button"], [aria-haspopup]';
+  var MENU_ANCESTOR_SELECTOR = '[role="menu"]';
+  var MENU_ITEM_SELECTOR = '[role="menuitem"], [aria-haspopup]';
+  var EXPANDED_SELECTOR = '[aria-expanded="true"][aria-haspopup]';
+  var GHOST_SELECTOR = "[data-dsh-transition-ghost]";
+  function numberValue(value) {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  }
+  function toBox(rect) {
+    if (!rect) return null;
+    const left = numberValue(rect.left);
+    const top = numberValue(rect.top);
+    let width = numberValue(rect.width);
+    let height = numberValue(rect.height);
+    if (width === null && left !== null) {
+      const right = numberValue(rect.right);
+      width = right === null ? null : right - left;
+    }
+    if (height === null && top !== null) {
+      const bottom = numberValue(rect.bottom);
+      height = bottom === null ? null : bottom - top;
+    }
+    if (left === null || top === null || width === null || height === null) return null;
+    return { left, top, width, height };
+  }
+  function isValidBox(box) {
+    return !!box && box.width > 0 && box.height > 0;
+  }
+  function isValidRect(rect) {
+    return isValidBox(toBox(rect));
+  }
+  function readRect(element) {
+    if (!isElement(element) || typeof element.getBoundingClientRect !== "function") return null;
+    try {
+      const rect = element.getBoundingClientRect();
+      return toBox(rect) ? rect : null;
+    } catch (error) {
+      return null;
+    }
+  }
+  function boxCenter(box) {
+    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  }
+  function centerDistance(a, b) {
+    const first = boxCenter(a);
+    const second = boxCenter(b);
+    const dx = first.x - second.x;
+    const dy = first.y - second.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function projectionGap(a, b) {
+    return {
+      dx: Math.max(0, a.left - (b.left + b.width), b.left - (a.left + a.width)),
+      dy: Math.max(0, a.top - (b.top + b.height), b.top - (a.top + a.height))
+    };
+  }
+  function adjacencyDistance(a, b) {
+    const gap = projectionGap(a, b);
+    const overlapX = gap.dx === 0;
+    const overlapY = gap.dy === 0;
+    const projectionAdjacent = overlapX && gap.dy <= ADJACENT_GAP_PX || overlapY && gap.dx <= ADJACENT_GAP_PX;
+    const nearestEdge = Math.sqrt(gap.dx * gap.dx + gap.dy * gap.dy);
+    if (!projectionAdjacent && nearestEdge > ADJACENT_GAP_PX) return null;
+    const distance = centerDistance(a, b);
+    if (distance > MAX_CENTER_DISTANCE_PX) return null;
+    return distance;
+  }
+  function elementMatches(element, selector) {
+    if (!isElement(element) || typeof element.matches !== "function") return false;
+    try {
+      return element.matches(selector);
+    } catch (error) {
+      return false;
+    }
+  }
+  function closestMatch(element, selector) {
+    if (!isElement(element) || typeof element.closest !== "function") return null;
+    try {
+      return element.closest(selector);
+    } catch (error) {
+      return null;
+    }
+  }
+  function containsNode(container, node) {
+    if (!isElement(container) || !node) return false;
+    if (container === node) return true;
+    try {
+      return typeof container.contains === "function" && container.contains(node);
+    } catch (error) {
+      return false;
+    }
+  }
+  function tagNameOf(element) {
+    const name = isElement(element) ? element.tagName : null;
+    return typeof name === "string" ? name.toUpperCase() : "";
+  }
+  function sourceFromElement(element) {
+    if (!isElement(element)) return null;
+    const rect = readRect(element);
+    if (!isValidRect(rect)) return null;
+    return { kind: "element", rect };
+  }
+  function findSiblingTrigger(container, surface, selector) {
+    if (!isElement(container)) return null;
+    let children = [];
+    try {
+      children = Array.from(container.children || []);
+    } catch (error) {
+      return null;
+    }
+    const surfaceBox = toBox(readRect(surface));
+    let best = null;
+    let bestDistance = Infinity;
+    for (const child of children) {
+      if (child === surface || containsNode(surface, child)) continue;
+      if (!elementMatches(child, selector)) continue;
+      const box = toBox(readRect(child));
+      if (!isValidBox(box)) continue;
+      const distance = surfaceBox ? centerDistance(surfaceBox, box) : 0;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = child;
+      }
+    }
+    return best;
+  }
+  function createInteractionTracker(options = {}) {
+    const opts = options && typeof options === "object" ? options : {};
+    const now = typeof opts.now === "function" ? opts.now : () => Date.now();
+    let started = false;
+    let activeSnapshot = null;
+    let pointerRecord = null;
+    let moveRecord = null;
+    let keyboardRecord = null;
+    function getWindow() {
+      if (opts.window !== void 0) return opts.window || null;
+      if (typeof globalThis === "undefined") return null;
+      return globalThis.window || null;
+    }
+    function getDocument() {
+      if (opts.document !== void 0) return opts.document || null;
+      if (typeof globalThis !== "undefined" && globalThis.document) return globalThis.document;
+      const window2 = getWindow();
+      return window2 && window2.document ? window2.document : null;
+    }
+    function currentTime() {
+      try {
+        const value = Number(now());
+        return Number.isFinite(value) ? value : 0;
+      } catch (error) {
+        return 0;
+      }
+    }
+    function isFresh(record) {
+      return !!record && currentTime() - record.time <= FRESH_MS;
+    }
+    function readActiveElement(document2) {
+      if (!document2) return activeSnapshot;
+      try {
+        return isElement(document2.activeElement) ? document2.activeElement : null;
+      } catch (error) {
+        return activeSnapshot;
+      }
+    }
+    function snapshotActiveElement() {
+      activeSnapshot = readActiveElement(getDocument());
+    }
+    function readEventTarget(event) {
+      if (!event) return null;
+      try {
+        return isElement(event.target) ? event.target : null;
+      } catch (error) {
+        return null;
+      }
+    }
+    function readEventPoint(event) {
+      if (!event) return { x: null, y: null };
+      return { x: numberValue(event.clientX), y: numberValue(event.clientY) };
+    }
+    function recordPointer(event) {
+      const target = readEventTarget(event);
+      if (!target) return;
+      const point = readEventPoint(event);
+      pointerRecord = {
+        kind: "element",
+        rect: readRect(target),
+        target,
+        x: point.x,
+        y: point.y,
+        time: currentTime()
+      };
+    }
+    function recordMove(event) {
+      const point = readEventPoint(event);
+      moveRecord = { x: point.x, y: point.y, time: currentTime() };
+    }
+    function recordKeydown(event) {
+      const target = readEventTarget(event);
+      if (!target) return;
+      keyboardRecord = { kind: "element", rect: readRect(target), target, time: currentTime() };
+    }
+    function handlePointerDown(event) {
+      try {
+        recordPointer(event);
+        snapshotActiveElement();
+      } catch (error) {
+      }
+    }
+    function handleClick(event) {
+      try {
+        recordPointer(event);
+        snapshotActiveElement();
+      } catch (error) {
+      }
+    }
+    function handleKeydown(event) {
+      try {
+        recordKeydown(event);
+        snapshotActiveElement();
+      } catch (error) {
+      }
+    }
+    function handlePointerMove(event) {
+      try {
+        recordMove(event);
+        snapshotActiveElement();
+      } catch (error) {
+      }
+    }
+    function start() {
+      if (started) return;
+      const window2 = getWindow();
+      if (!window2 || typeof window2.addEventListener !== "function") return;
+      window2.addEventListener("pointerdown", handlePointerDown, true);
+      window2.addEventListener("click", handleClick, true);
+      window2.addEventListener("keydown", handleKeydown, true);
+      window2.addEventListener("pointermove", handlePointerMove, true);
+      started = true;
+    }
+    function stop() {
+      if (!started) return;
+      started = false;
+      const window2 = getWindow();
+      if (!window2 || typeof window2.removeEventListener !== "function") return;
+      window2.removeEventListener("pointerdown", handlePointerDown, true);
+      window2.removeEventListener("click", handleClick, true);
+      window2.removeEventListener("keydown", handleKeydown, true);
+      window2.removeEventListener("pointermove", handlePointerMove, true);
+    }
+    function resolveAdjacent(surface) {
+      const parent = surface.parentElement;
+      if (!isElement(parent)) return null;
+      if (closestMatch(parent, MENU_ANCESTOR_SELECTOR)) {
+        return sourceFromElement(closestMatch(parent, MENU_ITEM_SELECTOR)) || sourceFromElement(findSiblingTrigger(parent, surface, MENU_ITEM_SELECTOR));
+      }
+      const tagName = tagNameOf(parent);
+      if (tagName === "BODY" || tagName === "HTML") return null;
+      return sourceFromElement(findSiblingTrigger(parent, surface, TRIGGER_SELECTOR));
+    }
+    function resolveAriaControls(surface) {
+      let id = "";
+      try {
+        id = surface.getAttribute("id") || "";
+      } catch (error) {
+        return null;
+      }
+      if (!id) return null;
+      const document2 = getDocument();
+      if (!document2 || typeof document2.querySelector !== "function") return null;
+      const escaped = String(id).replace(/["\\]/g, "\\$&");
+      let trigger = null;
+      try {
+        trigger = document2.querySelector('[aria-controls~="' + escaped + '"]');
+      } catch (error) {
+        return null;
+      }
+      return sourceFromElement(trigger);
+    }
+    function resolveExpanded(surface) {
+      const surfaceBox = toBox(readRect(surface));
+      if (!isValidBox(surfaceBox)) return null;
+      const document2 = getDocument();
+      if (!document2 || typeof document2.querySelectorAll !== "function") return null;
+      let candidates = [];
+      try {
+        candidates = Array.from(document2.querySelectorAll(EXPANDED_SELECTOR));
+      } catch (error) {
+        return null;
+      }
+      let best = null;
+      let bestDistance = Infinity;
+      for (const candidate of candidates) {
+        if (containsNode(surface, candidate)) continue;
+        if (closestMatch(candidate, GHOST_SELECTOR)) continue;
+        const box = toBox(readRect(candidate));
+        if (!isValidBox(box)) continue;
+        const distance = adjacencyDistance(surfaceBox, box);
+        if (distance === null || distance >= bestDistance) continue;
+        bestDistance = distance;
+        best = candidate;
+      }
+      return sourceFromElement(best);
+    }
+    function resolveRecorded(record) {
+      if (!record || !isFresh(record) || !isElement(record.target)) return null;
+      let rect = null;
+      if (isElementConnected(record.target)) rect = readRect(record.target);
+      if (!isValidRect(rect)) rect = record.rect;
+      if (!isValidRect(rect)) return null;
+      return { kind: "element", rect };
+    }
+    function resolveKeyboard(surface) {
+      const active = readActiveElement(getDocument());
+      if (active && !containsNode(surface, active) && elementMatches(active, TRIGGER_SELECTOR)) {
+        const rect = readRect(active);
+        if (isValidRect(rect)) return { kind: "element", rect };
+      }
+      return resolveRecorded(keyboardRecord);
+    }
+    function resolve(surface) {
+      try {
+        if (!isElement(surface)) return null;
+        const adjacent = resolveAdjacent(surface);
+        if (adjacent) return adjacent;
+        const controlled = resolveAriaControls(surface);
+        if (controlled) return controlled;
+        const expanded = resolveExpanded(surface);
+        if (expanded) return expanded;
+        const pointer = resolveRecorded(pointerRecord);
+        if (pointer) return pointer;
+        return resolveKeyboard(surface);
+      } catch (error) {
+        return null;
+      }
+    }
+    function lastPointerPoint() {
+      try {
+        const record = pointerRecord || moveRecord;
+        if (!record || !isFresh(record)) return null;
+        if (typeof record.x !== "number" || typeof record.y !== "number") return null;
+        if (!Number.isFinite(record.x) || !Number.isFinite(record.y)) return null;
+        return { x: record.x, y: record.y };
+      } catch (error) {
+        return null;
+      }
+    }
+    return { start, stop, resolve, lastPointerPoint };
+  }
+  function normalizeZero(value) {
+    return value === 0 ? 0 : value;
+  }
+  function geometryForSource(source, surfaceRect, distancePx) {
+    try {
+      if (!source || source.kind !== "element" && source.kind !== "point") return null;
+      const box = toBox(surfaceRect);
+      if (!isValidBox(box)) return null;
+      let anchorX = null;
+      let anchorY = null;
+      if (source.kind === "point") {
+        anchorX = numberValue(source.x);
+        anchorY = numberValue(source.y);
+      } else {
+        const anchorBox = toBox(source.rect);
+        if (!anchorBox) return null;
+        anchorX = clampNumber(
+          box.left + box.width / 2,
+          anchorBox.left,
+          anchorBox.left + anchorBox.width
+        );
+        anchorY = clampNumber(
+          box.top + box.height / 2,
+          anchorBox.top,
+          anchorBox.top + anchorBox.height
+        );
+      }
+      if (anchorX === null || anchorY === null) return null;
+      const originX = normalizeZero(clampNumber(anchorX - box.left, 0, box.width));
+      const originY = normalizeZero(clampNumber(anchorY - box.top, 0, box.height));
+      const dx = originX - box.width / 2;
+      const dy = originY - box.height / 2;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      const distance = typeof distancePx === "number" && Number.isFinite(distancePx) ? distancePx : 0;
+      const translateX = length > 0 ? normalizeZero(dx / length * distance) : 0;
+      const translateY = length > 0 ? normalizeZero(dy / length * distance) : 0;
+      return { originX, originY, translateX, translateY };
+    } catch (error) {
+      return null;
+    }
   }
 
   // src/policy.js
@@ -909,8 +1337,97 @@
     const requestFrame = typeof options.requestFrame === "function" ? options.requestFrame : defaultRequestFrame;
     const cancelFrame = typeof options.cancelFrame === "function" ? options.cancelFrame : defaultCancelFrame;
     const specOptions = typeof options.computedStyle === "function" ? { computedStyle: options.computedStyle } : {};
-    function specsFor(element, kind, direction) {
-      return animationSpecsFor(element, kind, direction, supportsIndependentTransforms(), specOptions);
+    const origin = options.origin && typeof options.origin === "object" ? options.origin : null;
+    const fallbackMode = typeof options.fallbackMode === "function" ? options.fallbackMode : () => "fade";
+    let geometryCache = /* @__PURE__ */ new WeakMap();
+    function specsFor(element, kind, direction, geometry) {
+      return animationSpecsFor(element, kind, direction, supportsIndependentTransforms(), {
+        ...specOptions,
+        geometry: geometry || null
+      });
+    }
+    function fallbackModeValue() {
+      try {
+        return fallbackMode() === "pointer" ? "pointer" : "fade";
+      } catch (error) {
+        return "fade";
+      }
+    }
+    function resolveSource(element) {
+      if (!origin || typeof origin.resolve !== "function") return null;
+      try {
+        return origin.resolve(element);
+      } catch (error) {
+        return null;
+      }
+    }
+    function lastPointerPoint() {
+      if (!origin || typeof origin.lastPointerPoint !== "function") return null;
+      try {
+        return origin.lastPointerPoint();
+      } catch (error) {
+        return null;
+      }
+    }
+    function readSurfaceRect(element) {
+      if (!isElement(element) || typeof element.getBoundingClientRect !== "function") return null;
+      try {
+        const rect = element.getBoundingClientRect();
+        if (!rect) return null;
+        const width = Number(rect.width);
+        const height = Number(rect.height);
+        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+          return null;
+        }
+        return rect;
+      } catch (error) {
+        return null;
+      }
+    }
+    function surfaceDefFor2(kind) {
+      return SURFACE_DEFS[kind] || SURFACE_DEFS.menu;
+    }
+    function pointSource(point) {
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+      return { kind: "point", x: point.x, y: point.y };
+    }
+    function entryGeometryFor(element, kind) {
+      const rect = readSurfaceRect(element);
+      if (!rect) return null;
+      const distancePx = surfaceDefFor2(kind).distancePx;
+      const source = resolveSource(element);
+      let geometry = source ? geometryForSource(source, rect, distancePx) : null;
+      if (!geometry && fallbackModeValue() === "pointer") {
+        const point = pointSource(lastPointerPoint());
+        if (point) geometry = geometryForSource(point, rect, distancePx);
+      }
+      return geometry;
+    }
+    function exitGeometryFor(original, kind, rectElement) {
+      const cached = geometryCache.get(original);
+      if (cached) return cached;
+      const rect = readSurfaceRect(rectElement);
+      if (!rect) return null;
+      const distancePx = surfaceDefFor2(kind).distancePx;
+      const documentNode = root && root.nodeType === 9 ? root : root && root.ownerDocument;
+      let active = null;
+      try {
+        active = documentNode ? documentNode.activeElement : null;
+      } catch (error) {
+        active = null;
+      }
+      if (isElement(active) && active !== original && !(typeof original.contains === "function" && original.contains(active)) && isElementConnected(active)) {
+        const activeRect = readSurfaceRect(active);
+        if (activeRect) {
+          const geometry = geometryForSource({ kind: "element", rect: activeRect }, rect, distancePx);
+          if (geometry) return geometry;
+        }
+      }
+      if (fallbackModeValue() === "pointer") {
+        const point = pointSource(lastPointerPoint());
+        if (point) return geometryForSource(point, rect, distancePx);
+      }
+      return null;
     }
     let lastApplied = /* @__PURE__ */ new WeakMap();
     let batchKeys = /* @__PURE__ */ new WeakMap();
@@ -999,7 +1516,9 @@
       if (!canAnimate(element, intent.kind)) return;
       const timing = timingFor(intent.kind);
       if (!timing || !(timing.durationMs > 0)) return;
-      const specs = specsFor(element, intent.kind, "in");
+      const geometry = entryGeometryFor(element, intent.kind);
+      if (geometry) geometryCache.set(element, geometry);
+      const specs = specsFor(element, intent.kind, "in", geometry);
       let created = 0;
       for (const spec of specs) {
         const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);
@@ -1048,7 +1567,8 @@
         if (!isElement(target)) continue;
         const timing = timingFor(surface.kind);
         if (!timing || !(timing.durationMs > 0)) continue;
-        const specs = specsFor(target, surface.kind, "out");
+        const geometry = exitGeometryFor(surface.element, surface.kind, target);
+        const specs = specsFor(target, surface.kind, "out", geometry);
         for (const spec of specs) {
           const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);
           if (!animation) continue;
@@ -1183,6 +1703,7 @@
       batch = [];
       batchKeys = /* @__PURE__ */ new WeakMap();
       lastApplied = /* @__PURE__ */ new WeakMap();
+      geometryCache = /* @__PURE__ */ new WeakMap();
       cancelOwnedAnimations();
       for (const ghost of Array.from(ghosts)) removeGhost(ghost);
       ghosts.clear();
@@ -1203,10 +1724,74 @@
     return { start, dispose: stop, enqueue };
   }
 
+  // src/settings.js
+  var SETTINGS_KEY = "dsh.webui-transition.settings.v1";
+  var SETTINGS_EVENT = "dsh-webui-transition/settings";
+  var FALLBACK_MODES = Object.freeze(["fade", "pointer"]);
+  var DEFAULT_SETTINGS = Object.freeze({ fallback: "fade" });
+  function defaults() {
+    return { fallback: DEFAULT_SETTINGS.fallback };
+  }
+  function resolveStorage() {
+    try {
+      const scope = globalScope();
+      return scope ? scope.localStorage : null;
+    } catch (error) {
+      return null;
+    }
+  }
+  function normalizeSettings(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return defaults();
+    if (!FALLBACK_MODES.includes(value.fallback)) return defaults();
+    return { fallback: value.fallback };
+  }
+  function readSettings(storage = void 0) {
+    const target = storage === void 0 ? resolveStorage() : storage;
+    if (!target || typeof target.getItem !== "function") return defaults();
+    try {
+      const raw = target.getItem(SETTINGS_KEY);
+      if (typeof raw !== "string" || !raw) return defaults();
+      let parsed = null;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (error) {
+        return defaults();
+      }
+      return normalizeSettings(parsed);
+    } catch (error) {
+      return defaults();
+    }
+  }
+
   // src/browser.js
   function apply(ctx) {
-    const runtime = createTransitionRuntime({ root: document });
-    ctx.effect(() => runtime.start(), "dsh-webui-transition: runtime");
+    let settings = readSettings();
+    const fallbackMode = () => settings.fallback;
+    const view = typeof window !== "undefined" ? window : null;
+    const tracker = createInteractionTracker({ window: view, document });
+    const runtime = createTransitionRuntime({ root: document, origin: tracker, fallbackMode });
+    ctx.effect(() => {
+      tracker.start();
+      const stopRuntime = runtime.start();
+      const offSettings = ctx && typeof ctx.on === "function" ? ctx.on(SETTINGS_EVENT, (next) => {
+        settings = normalizeSettings(next);
+      }) : null;
+      const onStorage = (event) => {
+        if (event && event.key !== null && event.key !== SETTINGS_KEY) return;
+        settings = readSettings();
+      };
+      if (view && typeof view.addEventListener === "function") {
+        view.addEventListener("storage", onStorage);
+      }
+      return () => {
+        if (view && typeof view.removeEventListener === "function") {
+          view.removeEventListener("storage", onStorage);
+        }
+        if (typeof offSettings === "function") offSettings();
+        stopRuntime();
+        tracker.stop();
+      };
+    }, "dsh-webui-transition: runtime");
   }
   var api = {
     createPolicy,

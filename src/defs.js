@@ -35,6 +35,8 @@ export const TOKEN_FALLBACK = {
 };
 
 // 冻结的时长/几何策略表：kind → token / fallback / clamp / 入场几何 / 动画拆分方式。
+// distancePx：入场首帧沿「表面中心 → transform-origin」方向偏移的距离；正值 = 从触发侧
+// 起步（退场时收向触发侧）。零 = 不做方向位移。
 export const SURFACE_DEFS = {
   menu: {
     role: "menu",
@@ -42,7 +44,7 @@ export const SURFACE_DEFS = {
     fallbackMs: 150,
     minMs: 120,
     maxMs: 160,
-    distancePx: -4,
+    distancePx: 4,
     scaleFrom: 0.98,
     opacityFrom: 0,
     easing: null, // null = 用 --ds-ease-in-out
@@ -55,7 +57,7 @@ export const SURFACE_DEFS = {
     fallbackMs: 150,
     minMs: 120,
     maxMs: 160,
-    distancePx: -4,
+    distancePx: 4,
     scaleFrom: 0.98,
     opacityFrom: 0,
     easing: null,
@@ -69,7 +71,7 @@ export const SURFACE_DEFS = {
     minMs: 160,
     maxMs: 240,
     distancePx: 12,
-    scaleFrom: 1,
+    scaleFrom: 0.98,
     opacityFrom: 0,
     easing: DIALOG_EASING,
     splitFade: false,
