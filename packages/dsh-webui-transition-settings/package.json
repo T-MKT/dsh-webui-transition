@@ -1,6 +1,6 @@
 {
   "name": "@tak1208/dsh-webui-transition-settings",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "DSH Web GUI 扩展：过渡动画设置页（Settings → 过渡动画），为 @tak1208/dsh-webui-transition 提供无锚点回退方式选择。",
   "keywords": [
     "dsh",
