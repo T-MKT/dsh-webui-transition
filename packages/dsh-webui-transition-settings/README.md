@@ -1,6 +1,10 @@
-# @tak1208/dsh-webui-transition-settings
+<h1 align="center">dsh-webui-transition-settings</h1>
+
+<div align="center">
 
 [![npm version](https://img.shields.io/npm/v/@tak1208/dsh-webui-transition-settings)](https://www.npmjs.com/package/@tak1208/dsh-webui-transition-settings)
+
+</div>
 
 `@tak1208/dsh-webui-transition` 的可选设置插件：在 DSH（DeepSeek Harness）Web GUI 的 Settings 弹窗中新增「过渡动画」页，用于选择主插件在**无法推断触发元素**时的回退入场方式。
 

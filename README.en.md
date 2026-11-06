@@ -1,7 +1,11 @@
-# dsh-webui-transition
+<h1 align="center">dsh-webui-transition</h1>
+
+<div align="center">
 
 [![npm version](https://img.shields.io/npm/v/@tak1208/dsh-webui-transition)](https://www.npmjs.com/package/@tak1208/dsh-webui-transition)
 [![CI](https://github.com/T-MKT/dsh-webui-transition/actions/workflows/ci.yml/badge.svg)](https://github.com/T-MKT/dsh-webui-transition/actions/workflows/ci.yml)
+
+</div>
 
 A third-party client plugin that adds open/close transitions to two places in the DSH (DeepSeek Harness) Web GUI: dropdown menus and the settings panel. It ships as a dsh bundle, runs entirely in the browser half, does not modify dsh source code, and has no third-party runtime dependencies.
 
@@ -37,7 +41,7 @@ The settings page is provided by the separate plugin `@tak1208/dsh-webui-transit
 
 ## Installation
 
-This repository is a dsh bundle: the root `package.json` declares `dsh.bundle.patch` (the Loader inserts two plugin rows: the main plugin and the settings plugin) and `dsh.client` (browser half, pointing at the build artifact `client.js`, classic script). The root package depends on the settings package via `workspace:^`, which pnpm rewrites to `^0.3.0` on publish. It is compatible with dsh `0.2.2-alpha.2` (`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`).
+This repository is a dsh bundle: the root `package.json` declares `dsh.bundle.patch` (the Loader inserts two plugin rows: the main plugin and the settings plugin) and `dsh.client` (browser half, pointing at the build artifact `client.js`, classic script). The root package depends on the settings package via `workspace:^`, which pnpm rewrites to `^1.0.0` on publish. It is compatible with dsh `0.2.2-alpha.2` (`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`).
 
 **Install from npm (recommended)**:
 
@@ -71,17 +75,11 @@ Set `data-dsh-transition="off"` on any UI element or one of its ancestors and th
 </div>
 ```
 
-The attribute can also be added or removed at runtime. This is the same mechanism as `dsh-motion`'s `data-dsh-motion="off"`.
+The attribute can also be added or removed at runtime.
 
 ## Reduced Motion
 
 When the system "Reduce motion" setting is on (`prefers-reduced-motion: reduce`), no animation plays and no ghost node is created. Turning it on at runtime immediately cancels animations that are playing and removes exit ghosts; after that, new animations automatically stay off, and they resume once the setting is turned off.
-
-## Coexistence with Other Motion Plugins
-
-- Works alongside motion-related plugins such as `dsh-reduce-effects` and `dsh-theme-studio`: this plugin only fills the two surfaces the host does not animate and never overrides existing host animations — an element with unfinished WAAPI animations or a non-`none` CSS `animation-name` is skipped entirely (the `canAnimate` gate).
-- It does not do message entrance, streaming rendering, or smooth scrolling, so it does not overlap with plugins such as `dsh-smooth-stream`.
-- To turn this plugin off as well: use `data-dsh-transition="off"` above, or enable the system "Reduce motion" setting.
 
 ## Known Limitations
 
@@ -90,7 +88,7 @@ When the system "Reduce motion" setting is on (`prefers-reduced-motion: reduce`)
 - Registers no slots and renders no components (except the settings plugin); the main plugin is observation + WAAPI only.
 - Does not modify host unmount timing (all exits use the ghost copy, no delayed-unmount patch).
 - Does not modify dsh source code and does not write `package.json` / `cordis.patch.yml` into a profile.
-- Baseline is dsh `0.2.2-alpha.2`; after a dsh upgrade (especially 0.3.0 and later) the semantic selectors, `settings.section`, and client contract need re-checking.
+- Baseline is dsh `0.2.2-alpha.2`; older dsh versions are not supported yet. After a dsh upgrade (especially 0.3.0 and later) the semantic selectors, `settings.section`, and client contract need re-checking.
 - Coverage depends on the host's semantic DOM (`role="menu"`, `role="dialog"` + `[data-shortcut-modal="settings"]`); changes to that structure affect coverage.
 - Trigger inference is heuristic: it keeps a 2.5s freshness window, a 24px adjacency gate, and a 1400px distance cap; when it cannot be sure it prefers the fallback over guessing.
 - A glass surface's `backdrop-filter` (such as the menu's `.material` layer) stays blurred throughout the transition: the menu's fade is applied to its direct children and exit ghosts no longer strip `backdrop-filter`, so the page backdrop is sampled for the whole enter/exit animation.

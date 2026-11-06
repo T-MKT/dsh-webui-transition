@@ -1,7 +1,11 @@
-# dsh-webui-transition
+<h1 align="center">dsh-webui-transition</h1>
+
+<div align="center">
 
 [![npm version](https://img.shields.io/npm/v/@tak1208/dsh-webui-transition)](https://www.npmjs.com/package/@tak1208/dsh-webui-transition)
 [![CI](https://github.com/T-MKT/dsh-webui-transition/actions/workflows/ci.yml/badge.svg)](https://github.com/T-MKT/dsh-webui-transition/actions/workflows/ci.yml)
+
+</div>
 
 为 DSH（DeepSeek Harness）Web GUI 补上两处开合过渡动画的第三方客户端插件：各级下拉菜单与设置面板。它是一个 dsh bundle，纯浏览器半区运行，不修改 dsh 源码、无第三方运行时依赖。
 
@@ -37,7 +41,7 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 
 ## 安装
 
-本仓库形态为 dsh bundle：根包 `package.json` 声明 `dsh.bundle.patch`（Loader 插入两行插件：主插件 + 设置插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。根包以 `workspace:^` 依赖设置包，发布时 pnpm 自动改写为 `^0.3.0`。兼容 dsh `0.2.2-alpha.2`（`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`）。
+本仓库形态为 dsh bundle：根包 `package.json` 声明 `dsh.bundle.patch`（Loader 插入两行插件：主插件 + 设置插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。根包以 `workspace:^` 依赖设置包，发布时 pnpm 自动改写为 `^1.0.0`。兼容 dsh `0.2.2-alpha.2`（`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`）。
 
 **通过 npm 安装（推荐）**：
 
@@ -71,17 +75,11 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 </div>
 ```
 
-也可以在运行时动态添加/移除该属性。其机制与 `dsh-motion` 的 `data-dsh-motion="off"` 相同。
+也可以在运行时动态添加/移除该属性。
 
 ## 减少动态效果
 
 系统开启「减少动态效果」（`prefers-reduced-motion: reduce`）时，不播放任何动画、不生成幽灵节点。运行中开启会立即取消正在播放的动画并清除退场幽灵；此后新动画自动保持不播，关闭该设置后新动画恢复播放。
-
-## 与其它动效插件共存
-
-- 与 `dsh-reduce-effects`、`dsh-theme-studio` 等动效相关插件共存：本插件只补宿主本身没有的两处表面，不覆盖宿主已有动画——元素已有未完成的 WAAPI 动画或 CSS `animation-name` 非 `none` 时一律跳过（`canAnimate` 门卫）。
-- 不做消息入场、流式渲染、平滑滚动，不与 `dsh-smooth-stream` 等插件的领地重叠。
-- 若想连本插件一起关掉：使用上面的 `data-dsh-transition="off"`，或开启系统「减少动态效果」。
 
 ## 已知边界
 
@@ -90,7 +88,7 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 - 不注册 slot、不渲染组件（设置插件除外）；主插件纯观察 + WAAPI。
 - 不修改宿主卸载时序（退场全部走幽灵副本，不使用延迟卸载补丁）。
 - 不修改 dsh 源码，不往 profile 写入 `package.json` / `cordis.patch.yml`。
-- 版本基线为 dsh `0.2.2-alpha.2`；dsh 升级（尤其 0.3.0 及以上）后需重新检查语义选择器、`settings.section` 与客户端契约。
+- 版本基线为 dsh `0.2.2-alpha.2`；暂不支持更旧的 dsh 版本。dsh 升级（尤其 0.3.0 及以上）后需重新检查语义选择器、`settings.section` 与客户端契约。
 - 覆盖范围依赖宿主语义 DOM（`role="menu"`、`role="dialog"` + `[data-shortcut-modal="settings"]`）；宿主改动语义结构会影响覆盖面。
 - 触发源推断是启发式的：保留 2.5s 新鲜度、24px 邻接闸门与 1400px 距离上限；无法确认时宁可走回退，不猜。
 - 玻璃表面的 `backdrop-filter`（如菜单的 `.material` 层）在过渡期间保持模糊：菜单的淡入淡出下沉到直接子级、退场幽灵不再剥离 `backdrop-filter`，因此入场/退场动画全程都在采样页面背景。

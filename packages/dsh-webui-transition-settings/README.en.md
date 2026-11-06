@@ -1,6 +1,10 @@
-# @tak1208/dsh-webui-transition-settings
+<h1 align="center">dsh-webui-transition-settings</h1>
+
+<div align="center">
 
 [![npm version](https://img.shields.io/npm/v/@tak1208/dsh-webui-transition-settings)](https://www.npmjs.com/package/@tak1208/dsh-webui-transition-settings)
+
+</div>
 
 Optional settings plugin for `@tak1208/dsh-webui-transition`. It adds a **Transitions** page to the DSH (DeepSeek Harness) Web GUI Settings dialog for choosing how the main plugin falls back when it cannot infer the trigger element.
 
