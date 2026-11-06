@@ -41,7 +41,8 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 
 ## 安装
 
-本仓库形态为 dsh bundle：根包 `package.json` 声明 `dsh.bundle.patch`（Loader 插入两行插件：主插件 + 设置插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。根包以 `workspace:^` 依赖设置包，发布时 pnpm 自动改写为 `^1.0.0`。兼容 dsh `0.2.2-alpha.2`（`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`）。
+本仓库形态为 dsh bundle：根包 `package.json` 声明 `dsh.bundle.patch`（Loader 插入两行插件：主插件 + 设置插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。根包以 `workspace:^` 依赖设置包，发布时 pnpm 自动改写为 `^1.0.0`。
+基于 dsh `0.2.2-rc.1` 开发，兼容 dsh `0.2.2-alpha.2` 及以上版本。（`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`）。
 
 **通过 npm 安装（推荐）**：
 
@@ -63,7 +64,7 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 
 1. 先 `pnpm install && pnpm build` 生成两个 `client.js`；
 2. 把两个包分别 link / 安装进 profile（或先发布设置包的预发布版，再装根包）；
-3. 发布顺序：先 `@tak1208/dsh-webui-transition-settings`，后 `@tak1208/dsh-webui-transition`。
+3. 发布顺序：先 `dsh-webui-transition-settings`，后 `dsh-webui-transition`。
 
 ## 退出开关
 

@@ -3,7 +3,8 @@
 ## 环境要求
 项目全局使用 `pnpm` 进行操作。
 
-当前项目兼容 `dsh` 版本：`0.2.2-alpha.2`
+当前项目基线 `dsh` 版本：`0.2.2-rc.1`
+当前项目兼容 `dsh` 版本：`0.2.2-rc.1`
 
 常用命令：`pnpm build`（主插件 `src/browser.js` → `client.js`；设置插件 `packages/dsh-webui-transition-settings/src/browser.js` → 该包 `client.js`）、`pnpm test`（先构建，再跑 `node --test`）。
 

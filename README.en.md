@@ -41,7 +41,8 @@ The settings page is provided by the separate plugin `@tak1208/dsh-webui-transit
 
 ## Installation
 
-This repository is a dsh bundle: the root `package.json` declares `dsh.bundle.patch` (the Loader inserts two plugin rows: the main plugin and the settings plugin) and `dsh.client` (browser half, pointing at the build artifact `client.js`, classic script). The root package depends on the settings package via `workspace:^`, which pnpm rewrites to `^1.0.0` on publish. It is compatible with dsh `0.2.2-alpha.2` (`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`).
+This repository is a dsh bundle: the root `package.json` declares `dsh.bundle.patch` (the Loader inserts two plugin rows: the main plugin and the settings plugin) and `dsh.client` (browser half, pointing at the build artifact `client.js`, classic script). The root package depends on the settings package via `workspace:^`, which pnpm rewrites to `^1.0.0` on publish.
+Developed against dsh `0.2.2-rc.1`, compatible with dsh `0.2.2-alpha.2` and above. (`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`).
 
 **Install from npm (recommended)**:
 
@@ -63,7 +64,7 @@ One command installs both the root package and the settings package it depends o
 
 1. Run `pnpm install && pnpm build` to generate both `client.js` artifacts;
 2. Link / install the two packages into the profile separately (or publish a prerelease of the settings package first, then install the root package);
-3. Publish order: `@tak1208/dsh-webui-transition-settings` first, then `@tak1208/dsh-webui-transition`.
+3. Publish order: `dsh-webui-transition-settings` first, then `dsh-webui-transition`.
 
 ## Opting Out
 
