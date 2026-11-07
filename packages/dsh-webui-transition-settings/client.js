@@ -161,6 +161,34 @@ function createSettingsPage({ readSettings: readSettings2, writeSettings: writeS
   return SettingsPage;
 }
 
+// packages/dsh-webui-transition-settings/src/nav-icon.js
+var import_react2 = __toESM(require("react"), 1);
+function NavIcon({ size = 16 }) {
+  return import_react2.default.createElement(
+    "svg",
+    {
+      width: size,
+      height: size,
+      viewBox: "0 0 16 16",
+      fill: "none",
+      "aria-hidden": "true"
+    },
+    import_react2.default.createElement("path", {
+      d: "M 7.2 12.64 L 4.1 14.21 L 4.78 9.89 L 1.69 6.8 L 6.01 6.11 L 8 2.22 L 9.99 6.11 L 14.31 6.8 L 13.3 7.81",
+      stroke: "currentColor",
+      strokeWidth: 1,
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }),
+    import_react2.default.createElement("path", {
+      d: "M 11.12 9.47 H 14.35 M 9.15 11.43 H 12.4 M 10.47 13.38 H 13.69",
+      stroke: "currentColor",
+      strokeWidth: 0.75,
+      strokeLinecap: "round"
+    })
+  );
+}
+
 // packages/dsh-webui-transition-settings/src/locale.js
 var NS = "webui-transition";
 var zh = {
@@ -182,6 +210,7 @@ var en = {
 
 // packages/dsh-webui-transition-settings/src/browser.js
 var inject = ["slots", "locale"];
+var SECTION_ID = "webui-transition";
 function apply(ctx) {
   const t = ctx.locale.bind(NS);
   const Page = createSettingsPage({
@@ -196,7 +225,7 @@ function apply(ctx) {
       () => ctx.slots.register(
         {
           name: "settings.section",
-          id: "webui-transition",
+          id: SECTION_ID,
           order: 25,
           label: () => t("nav"),
           locale: NS
@@ -205,6 +234,13 @@ function apply(ctx) {
       )
     ),
     "webui-transition-settings: page"
+  );
+  ctx.effect(
+    () => ctx.slots.inject(
+      "settings.section.icon",
+      () => ctx.slots.register({ name: "settings.section.icon", id: SECTION_ID }, NavIcon)
+    ),
+    "webui-transition-settings: nav icon"
   );
 }
 

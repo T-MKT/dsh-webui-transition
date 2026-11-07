@@ -49,7 +49,8 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │   ├── README.md / README.en.md              # 设置包说明（中英同步）
 │   ├── locale/en.json / locale/zh.json       # meta.title/description（插件清单显示）
 │   └── src/
-│       ├── browser.js                        # factory 入口：inject/apply + settings.section 注册
+│       ├── browser.js                        # factory 入口：inject/apply + settings.section / settings.section.icon 注册
+│       ├── nav-icon.js                       # settings.section.icon 导航图标（内联 logo）
 │       ├── settings-page.js                  # React 页面（SegmentedControl）
 │       ├── contract.js                       # 与主包重复的 key/event/default/modes + read/write
 │       └── locale.js                         # zh/en 运行时文案
@@ -67,6 +68,7 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │   ├── frames.test.mjs
 │   ├── runtime.test.mjs
 │   ├── settings-page.test.mjs                # 设置页渲染 / 切换写 storage + emit
+│   ├── nav-icon.test.mjs                     # 设置导航图标渲染 / 与插件页 logo 防漂移
 │   ├── settings-plugin.test.mjs              # 设置插件产物 / inject / slot 注册
 │   └── bundle.test.mjs                       # 两个构建产物冒烟：classic 契约 + 冻结签名
 ├── locale/en.json / locale/zh.json           # 根包展示元信息（meta.title/description）

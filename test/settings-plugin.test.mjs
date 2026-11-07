@@ -3,7 +3,8 @@
  *
  * 通过 fake __ModuleLoader__ 捕获注册记录，用 baseline 模块桩材料化 factory，
  * 再用 fake ctx（slots / locale / emit / effect）执行 apply，断言：
- * 注册 id、inject、locale 文案注册、settings.section 注入与 slot options、清理可执行。
+ * 注册 id、inject、locale 文案注册、settings.section 与 settings.section.icon
+ * 注入及 slot options、清理可执行。
  *
  * 依据：.agents/plan/v0.3.0/origin-aware-and-settings.md §2.7 / §3.6.1。
  */
@@ -165,26 +166,33 @@ pluginTest("apply 注册 locale 字典（NS + zh/en）", () => {
   assert.equal(dictionaries.en.fallbackPointer, "Pointer origin");
 });
 
-pluginTest("apply 向 settings.section 注入并注册设置页 slot", () => {
+pluginTest("apply 向 settings.section 与 settings.section.icon 注入并注册 slot", () => {
   const state = applyToFake();
-  assert.deepEqual(state.injections, ["settings.section"]);
+  assert.deepEqual(state.injections, ["settings.section", "settings.section.icon"]);
 
-  assert.equal(state.registrations.length, 1);
-  const [{ options, component }] = state.registrations;
-  assert.equal(options.name, "settings.section");
+  assert.equal(state.registrations.length, 2);
+  const section = state.registrations.find(({ options }) => options.name === "settings.section");
+  const icon = state.registrations.find(({ options }) => options.name === "settings.section.icon");
+  assert.ok(section && icon, "必须同时注册设置页与导航图标");
+
+  const { options, component } = section;
   assert.equal(options.id, "webui-transition");
   assert.equal(options.order, 25);
   assert.equal(options.locale, "webui-transition");
   assert.equal(typeof options.label, "function");
   assert.equal(options.label(), "nav", "label 通过 locale.bind 的 t（恒等桩）取 nav");
   assert.equal(typeof component, "function", "slot 组件应为 React 组件");
+
+  assert.equal(icon.options.id, options.id, "图标 id 必须等于分区 id，否则外壳不渲染");
+  assert.equal(typeof icon.component, "function", "图标组件应为 React 组件");
 });
 
-pluginTest("两个 effect 均带可执行的清理函数", () => {
+pluginTest("三个 effect 均带可执行的清理函数", () => {
   const state = applyToFake();
-  assert.equal(state.effects.length, 2);
+  assert.equal(state.effects.length, 3);
   assert.deepEqual(state.effects.map((entry) => entry.name).sort(), [
     "webui-transition-settings: dictionaries",
+    "webui-transition-settings: nav icon",
     "webui-transition-settings: page",
   ]);
   for (const entry of state.effects) {
