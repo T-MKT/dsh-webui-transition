@@ -32,7 +32,7 @@
     "index.js",
     "client.js",
     "locale/*.json",
-    "assets/icons/outline.svg",
+    "assets/icons/logo.png",
     "README.md",
     "README.en.md"
   ],

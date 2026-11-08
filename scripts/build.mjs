@@ -1,8 +1,10 @@
 /**
- * scripts/build.mjs — 两个浏览器半区产物的构建。
+ * scripts/build.mjs — 生成设置页导航图标，并构建两个浏览器半区产物。
  *
- * 1. 主插件：src/browser.js → client.js（classic IIFE）。
- * 2. 设置插件：packages/dsh-webui-transition-settings/src/browser.js → 该包 client.js。
+ * 1. 设置页导航图标：packages/dsh-webui-transition-settings/assets/icons/outline.svg
+ *    → 该包 src/nav-icon.js（生成物，提交并由 CI 校验）。
+ * 2. 主插件：src/browser.js → client.js（classic IIFE）。
+ * 3. 设置插件：packages/dsh-webui-transition-settings/src/browser.js → 该包 client.js。
  *    先以 esbuild cjs 打包（React / primitives 等 baseline 模块保持 external），
  *    再包进 `window.__ModuleLoader__.load({ id, factory })` 的 classic 契约。
  *
@@ -16,6 +18,8 @@ import { writeFile } from "node:fs/promises";
 
 import { build } from "esbuild";
 
+import { generateNavIcon } from "./generate-nav-icon.mjs";
+
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const settingsRoot = path.join(root, "packages", "dsh-webui-transition-settings");
 
@@ -28,6 +32,9 @@ const SETTINGS_EXTERNAL = [
   "react-dom",
   "@deepseek-ai/dsh-client-ui-primitives",
 ];
+
+// 0. 设置页导航图标：outline.svg → src/nav-icon.js（生成物）。
+await generateNavIcon();
 
 // 1. 主插件：classic IIFE。
 await build({

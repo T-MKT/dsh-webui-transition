@@ -28,7 +28,7 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 
 ## 设置
 
-设置页由独立插件 `@tak1208/dsh-webui-transition-settings` 提供，入口为 **Settings → 过渡动画**（英文 `Transitions`），侧栏导航行显示插件 logo。目前只有一项：
+设置页由独立插件 `@tak1208/dsh-webui-transition-settings` 提供，入口为 **Settings → 过渡动画**（英文 `Transitions`），侧栏导航行显示线稿图标。目前只有一项：
 
 | 设置 | 取值 | 默认 | 含义 |
 | --- | --- | --- | --- |
@@ -102,7 +102,7 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 仓库是 pnpm workspace，两个包：
 
 - 根包 `@tak1208/dsh-webui-transition`：bundle + 主 client 插件。源码是 `src/` 下的 ESM 模块，一个文件一个职责：`defs.js`（常量与 `SURFACE_DEFS` 表面描述符）、`utils.js`（通用小工具）、`policy.js`（token / reduced-motion / 时长策略）、`tracker.js`（表面状态机与 DOM 分类）、`gate.js`（WAAPI / CSS animation / CSS transition 冲突门卫）、`settings.js`（localStorage 设置契约）、`origin.js`（交互捕获、触发源解析与 origin 几何）、`frames.js`（纯关键帧函数，含原点感知几何与伪元素玻璃拆分）、`runtime.js`（观察、批量、入场与退场幽灵）、`browser.js`（浏览器入口，注册到 `window.__ModuleLoader__`）。入口经 esbuild 打包为根目录的 classic iife 产物 `client.js`。
-- 设置包 `packages/dsh-webui-transition-settings`：独立 client 插件，`src/browser.js` 注册 `settings.section` 设置页与 `settings.section.icon` 导航图标，`src/settings-page.js` 用 `@deepseek-ai/dsh-client-ui-primitives` 的 `SegmentedControl` 渲染，`src/contract.js` 与主包 `src/settings.js` 各自独立实现同一份设置契约（由 `test/contract.test.mjs` 防漂移）。构建产物是该包的 `client.js`（esbuild cjs 包进 `__ModuleLoader__.load` factory）。
+- 设置包 `packages/dsh-webui-transition-settings`：独立 client 插件，`src/browser.js` 注册 `settings.section` 设置页与 `settings.section.icon` 导航图标（组件由 `pnpm build` 从 `assets/icons/outline.svg` 生成 `src/nav-icon.js`），`src/settings-page.js` 用 `@deepseek-ai/dsh-client-ui-primitives` 的 `SegmentedControl` 渲染，`src/contract.js` 与主包 `src/settings.js` 各自独立实现同一份设置契约（由 `test/contract.test.mjs` 防漂移）。构建产物是该包的 `client.js`（esbuild cjs 包进 `__ModuleLoader__.load` factory）。
 
 两个 `client.js` 都是构建产物，由 `pnpm build` 生成，**不要手改**；改实现请改 `src/` 后重新构建。
 

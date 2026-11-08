@@ -1,14 +1,12 @@
 /**
- * packages/dsh-webui-transition-settings/src/nav-icon.js — 设置导航图标。
+ * packages/dsh-webui-transition-settings/src/nav-icon.js — 设置导航图标（生成文件，勿手改）。
  *
- * `settings.section.icon` 贡献：外壳在设置弹窗侧栏的导航行里以 16px、
- * `aria-hidden` 的装饰容器渲染它；文字与无障碍名仍来自 `settings.section`
- * 的 label，颜色继承 `.navCell` 的 currentColor，因此这里不需要文案、locale
- * 或尺寸以外的配置（外壳传入 `{ size, active }`，`active` 与宿主内置图标一样
- * 不参与绘制）。
+ * 由 scripts/generate-nav-icon.mjs 从
+ * packages/dsh-webui-transition-settings/assets/icons/outline.svg 生成；
+ * pnpm build 会重写本文件，CI 校验它与 SVG 一致。
  *
- * 图形与插件页图标同源（`assets/icons/logo.svg`）：同一份 logo 在两处消费，
- * 改动时需同步；`test/nav-icon.test.mjs` 比对两者防漂移。
+ * settings.section.icon 贡献：外壳在设置弹窗侧栏以 16px、aria-hidden 的装饰容器渲染它，
+ * 颜色继承 .navCell 的 currentColor，文字与无障碍名来自 settings.section 的 label。
  * 用 React.createElement 而非 JSX，使本文件可被 Node 直接 import 做渲染测试。
  */
 
@@ -27,18 +25,7 @@ export function NavIcon({ size = 16 }) {
       fill: "none",
       "aria-hidden": "true",
     },
-    React.createElement("path", {
-      d: "M 7.2 12.64 L 4.1 14.21 L 4.78 9.89 L 1.69 6.8 L 6.01 6.11 L 8 2.22 L 9.99 6.11 L 14.31 6.8 L 13.3 7.81",
-      stroke: "currentColor",
-      strokeWidth: 1,
-      strokeLinecap: "round",
-      strokeLinejoin: "round",
-    }),
-    React.createElement("path", {
-      d: "M 11.12 9.47 H 14.35 M 9.15 11.43 H 12.4 M 10.47 13.38 H 13.69",
-      stroke: "currentColor",
-      strokeWidth: 0.75,
-      strokeLinecap: "round",
-    }),
+    React.createElement("path", { stroke: "currentColor", strokeWidth: 1.3, strokeLinejoin: "round", strokeLinecap: "round", d: "M7.2 12.32L4.1 13.89L4.78 9.57L1.69 6.48L6.01 5.79L8 1.9L9.99 5.79L14.31 6.48L13.3 7.49" }),
+    React.createElement("path", { stroke: "currentColor", strokeWidth: 1, strokeLinecap: "round", d: "M11.12 9.47L14.35 9.47M9.15 11.43L12.4 11.43M10.47 13.38L13.69 13.38" }),
   );
 }

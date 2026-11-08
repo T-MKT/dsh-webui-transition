@@ -10,7 +10,7 @@
 
 ## 入口
 
-**Settings → 过渡动画**（英文界面为 `Transitions`）。侧栏导航行显示插件 logo（`settings.section.icon`，与插件页图标同一份 `assets/icons/logo.svg`；该 slot 由 dsh 0.2.2-alpha.3 起提供，更旧版本回落外壳默认齿轮）。
+**Settings → 过渡动画**（英文界面为 `Transitions`）。侧栏导航行显示线稿图标（`settings.section.icon`，源文件 `assets/icons/outline.svg`，组件由 `pnpm build` 生成；该 slot 由 dsh 0.2.2-alpha.3 起提供，更旧版本回落外壳默认齿轮）。
 
 ## 设置项
 
@@ -37,7 +37,7 @@
 ## 实现
 
 - `src/browser.js`：client 半区入口，`inject = ["slots", "locale"]`；注册 `settings.section` 设置页、`settings.section.icon` 导航图标与中英文文案。
-- `src/nav-icon.js`：`settings.section.icon` 的图标组件（内联 logo SVG，尺寸由外壳传入、颜色继承 `currentColor`；路径数据由 `test/nav-icon.test.mjs` 与 `assets/icons/logo.svg` 防漂移）。
+- `src/nav-icon.js`：`settings.section.icon` 的图标组件，**由 `pnpm build` 从 `assets/icons/outline.svg` 生成，不手改**；生成器只支持白名单元素/属性（超出即构建失败），尺寸由外壳传入、颜色继承 `currentColor`。
 - `src/settings-page.js`：`createSettingsPage`，用 shell 的 baseline 共享模块 `@deepseek-ai/dsh-client-ui-primitives` 的 `SegmentedControl` 渲染（不手写分段控件，布局只用 `--dsw-*` token）。
 - `src/contract.js`：与主包 `src/settings.js` 各自独立实现的同一份设置契约（由根仓库测试防漂移）。
 - `client.js`：构建产物（根仓库 `pnpm build` 生成，不手改）。

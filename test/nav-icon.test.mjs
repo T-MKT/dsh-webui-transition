@@ -1,35 +1,24 @@
 /**
  * test/nav-icon.test.mjs — 设置导航图标组件（settings.section.icon，真实 React + jsdom）。
  *
- * 断言组件交给外壳的渲染契约：16px 方形、currentColor 描边、纯装饰无文本；
- * 并与设置包内插件页 logo（`assets/icons/logo.svg`）比对路径数据——同一份
- * logo 在两处消费，任何一侧改动都会让本测试失败，避免视觉漂移。
+ * 组件由 `pnpm build` 从 `assets/icons/outline.svg` 生成（pretest 已先构建），
+ * 这里断言它交给外壳的渲染契约：尺寸跟随 size、矢量颜色继承 currentColor、
+ * 纯装饰无文本。图形与 SVG 的一致性由 CI 的构建产物校验兜底，不在此重复比对。
  */
 
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { after, beforeEach, test } from "node:test";
 
 import React from "react";
 import { createRoot } from "react-dom/client";
 
-import { document, disposeEnvironment, resetEnvironment, window } from "./helpers/env.mjs";
+import { document, disposeEnvironment, resetEnvironment } from "./helpers/env.mjs";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const { NavIcon } = await import(
   "../packages/dsh-webui-transition-settings/src/nav-icon.js"
 );
-
-const LOGO_URL = new URL(
-  "../packages/dsh-webui-transition-settings/assets/icons/logo.svg",
-  import.meta.url,
-);
-
-/** XML 属性值里的换行/缩进归一，便于跨 DOM 与源文件比对。 */
-function normalize(value) {
-  return value.trim().replace(/\s+/g, " ");
-}
 
 async function renderIcon(props = {}) {
   const container = document.createElement("div");
@@ -60,12 +49,12 @@ after(() => {
 test("默认以 16px 渲染一个纯装饰 svg", async () => {
   const { svg, unmount } = await renderIcon();
   assert.ok(svg, "必须渲染 svg 元素");
-  assert.equal(svg.getAttribute("viewBox"), "0 0 16 16");
+  assert.ok(svg.getAttribute("viewBox"), "必须带 viewBox");
   assert.equal(svg.getAttribute("width"), "16");
   assert.equal(svg.getAttribute("height"), "16");
-  assert.equal(svg.getAttribute("fill"), "none");
   assert.equal(svg.getAttribute("aria-hidden"), "true", "图标是装饰性的，对无障碍树隐藏");
   assert.equal(svg.textContent, "", "图标不得包含文本");
+  assert.ok(svg.children.length > 0, "必须包含至少一个图形元素");
   await unmount();
 });
 
@@ -76,22 +65,20 @@ test("size 控制方形边长", async () => {
   await unmount();
 });
 
-test("路径数据与插件页 logo 一致", async () => {
+test("颜色只使用 currentColor / none，跟随外壳主题", async () => {
   const { svg, unmount } = await renderIcon();
-  const source = await readFile(LOGO_URL, "utf8");
-  const parsed = new window.DOMParser().parseFromString(source, "image/svg+xml");
-  const expected = [...parsed.querySelectorAll("path")];
-  const actual = [...svg.querySelectorAll("path")];
-
-  assert.equal(actual.length, expected.length, "path 数量必须与 assets/icons/logo.svg 一致");
-  for (const [index, path] of actual.entries()) {
-    for (const name of ["d", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin"]) {
-      assert.equal(
-        normalize(path.getAttribute(name) ?? ""),
-        normalize(expected[index].getAttribute(name) ?? ""),
-        `第 ${index + 1} 条 path 的 ${name} 必须与 assets/icons/logo.svg 一致`,
+  let inherited = 0;
+  for (const element of svg.querySelectorAll("*")) {
+    for (const name of ["fill", "stroke", "stop-color"]) {
+      const value = element.getAttribute(name);
+      if (value === null) continue;
+      assert.ok(
+        value === "currentColor" || value === "none",
+        `${element.localName} 的 ${name} 必须是 currentColor 或 none，实际为 ${value}`,
       );
+      if (value === "currentColor") inherited += 1;
     }
   }
+  assert.ok(inherited > 0, "至少有一处使用 currentColor");
   await unmount();
 });
