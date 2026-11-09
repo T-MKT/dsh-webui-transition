@@ -46,7 +46,7 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 
 ## 安装
 
-本仓库形态为 dsh bundle：根包 `package.json` 声明 `dsh.bundle.patch`（Loader 插入两行插件：主插件 + 设置插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。根包以 `workspace:^` 依赖设置包，发布时 pnpm 自动改写为 `^1.0.0`。
+本仓库形态为 dsh bundle：根包 `package.json` 声明 `dsh.bundle.patch`（Loader 插入两行插件：主插件 + 设置插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。根包以 `workspace:^` 依赖设置包，发布时必须经 pnpm 打包，由 pnpm 把 `workspace:^` 改写为 `^1.0.0`（详见下节「发布」）。
 基于 dsh `0.2.2-rc.1` 开发，兼容 dsh `0.2.2-alpha.2` 及以上版本。（`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`）。
 
 **通过 npm 安装（推荐）**：
@@ -118,6 +118,12 @@ pnpm test    # pretest 先构建，再跑 node --test
 ```
 
 测试用 Node 内置 `node --test` + `jsdom`：`test/helpers/env.mjs` 负责 jsdom 装配、fake `__ModuleLoader__`、fake `animate`、fake storage 等，每个 `src/` 模块对应一个测试文件；`bundle.test.mjs` 对两个构建产物做 classic 契约冒烟，`contract.test.mjs` 比对两包设置契约，`settings-page.test.mjs` / `settings-plugin.test.mjs` 覆盖设置页与 slot 注册。
+
+## 发布
+
+两个包必须按序发布：先 `@tak1208/dsh-webui-transition-settings`，后根包 `@tak1208/dsh-webui-transition`（根包依赖设置包的 `^1.0.0`）。
+
+打包必须经 pnpm：`pnpm publish`，或 `pnpm pack` 生成 tarball 后 `npm publish <tarball>`（需要 npm 的 2FA 网页认证时走后者）。**不要用 `npm pack` / `npm publish` 直接从目录发布**：npm 不改写 `workspace:` 协议，tarball 里会原样带着 `workspace:^`，消费者安装直接失败（`EUNSUPPORTEDPROTOCOL`: `Unsupported URL Type "workspace:"`）。
 
 ## CI
 

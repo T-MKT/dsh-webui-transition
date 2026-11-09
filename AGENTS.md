@@ -8,6 +8,8 @@
 
 常用命令：`pnpm build`（先由 `outline.svg` 生成设置页导航图标 `src/nav-icon.js`，再打两个产物：主插件 `src/browser.js` → `client.js`；设置插件 `packages/dsh-webui-transition-settings/src/browser.js` → 该包 `client.js`）、`pnpm test`（先构建，再跑 `node --test`）。
 
+发布：两个包必须按序用 pnpm 打包发布（`pnpm publish`，或 `pnpm pack` 后 `npm publish <tarball>`）：先 `@tak1208/dsh-webui-transition-settings`，后根包。`npm pack` / `npm publish` 不改写 `workspace:^`，直接发布会产出消费者装不上的包。
+
 ## 工作原则
 - **禁止修改 `dsh` 源代码。**
 - 高内聚低耦合，文件及文件夹职责清晰。

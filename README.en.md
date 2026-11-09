@@ -47,7 +47,7 @@ The settings page is provided by the separate plugin `@tak1208/dsh-webui-transit
 
 ## Installation
 
-This repository is a dsh bundle: the root `package.json` declares `dsh.bundle.patch` (the Loader inserts two plugin rows: the main plugin and the settings plugin) and `dsh.client` (browser half, pointing at the build artifact `client.js`, classic script). The root package depends on the settings package via `workspace:^`, which pnpm rewrites to `^1.0.0` on publish.
+This repository is a dsh bundle: the root `package.json` declares `dsh.bundle.patch` (the Loader inserts two plugin rows: the main plugin and the settings plugin) and `dsh.client` (browser half, pointing at the build artifact `client.js`, classic script). The root package depends on the settings package via `workspace:^`; publishing must go through pnpm, which rewrites it to `^1.0.0` (see "Publishing" below).
 Developed against dsh `0.2.2-rc.1`, compatible with dsh `0.2.2-alpha.2` and above. (`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`).
 
 **Install from npm (recommended)**:
@@ -119,6 +119,12 @@ pnpm test    # pretest builds first, then runs node --test
 ```
 
 Tests use Node's built-in `node --test` with `jsdom`: `test/helpers/env.mjs` sets up jsdom plus fake `__ModuleLoader__`, fake `animate`, fake storage, and other fixtures; each `src/` module has its own test file. `bundle.test.mjs` smoke-tests both build artifacts for the classic contract, `contract.test.mjs` compares the two settings contracts, and `settings-page.test.mjs` / `settings-plugin.test.mjs` cover the settings page and slot registration.
+
+## Publishing
+
+Publish the two packages in order: `@tak1208/dsh-webui-transition-settings` first, then the root package `@tak1208/dsh-webui-transition` (the root package depends on the settings package's `^1.0.0`).
+
+Packing must go through pnpm: `pnpm publish`, or `pnpm pack` followed by `npm publish <tarball>` (use the latter when npm CLI's 2FA web authentication is needed). **Do not publish from the directory with `npm pack` / `npm publish`**: npm does not rewrite the `workspace:` protocol, the tarball keeps `workspace:^`, and consumers fail to install (`EUNSUPPORTEDPROTOCOL`: `Unsupported URL Type "workspace:"`).
 
 ## CI
 
