@@ -127,6 +127,6 @@ export function centerGeometryFor(rect) // → { originX: number, originY: numbe
 
 #### 3.5.1 一次提交
 
-- [ ] 只 `git add` §3.4 验证过的文件（含构建产物）；不带入工作区既有的 `COMPATIBLE_VERSION` 未提交改动；不提交本计划文档。
+- [ ] 只 `git add` §3.4 验证过的文件（含构建产物）。
 - [ ] 一次 Conventional Commits 提交，提交信息 body 注明完成本计划节点与前置计划（如 `plan: v1.0.0/remove-displacement.md §3.1–3.4（依赖 settings-center-origin）`）；不 push。
 - **完成判据**：`git log -1 --stat` 显示单次提交，文件清单与预期一致。

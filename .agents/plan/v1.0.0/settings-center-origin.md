@@ -99,33 +99,33 @@ effect 名称（测试断言用）：`"webui-transition-settings: settings panel
 
 #### 3.1.1 新增 `src/marker.js` 并在 runtime 生效
 
-- [ ] `src/marker.js`：按 §2 冻结签名实现 4 个导出；`isCenterOriginSurface` 用 `nodeType === 1` + `getAttribute` 判定，读取异常一律 `false`；`centerGeometryFor` 用 `rect.width / 2`、`rect.height / 2`，`-0` 归一为 `+0`。
-- [ ] `src/runtime.js`：`entryGeometryFor` 在 `readSurfaceRect` 成功后先判标记 → 直接 `return centerGeometryFor(rect)`（跳过 `resolveSource` 与 `fallbackMode` 的指针回退）；`exitGeometryFor` 在缓存未命中的路径里对 `original` 与 `rectElement` 任一命中标记 → 返回中心几何；更新 `geometryCache` 形状注释。
-- [ ] `test/runtime.test.mjs`：新增 3 条用例——① 标记面板 + 无触发源（`origin.resolve` 返回 `null`、`fallbackMode: () => "fade"`）仍产生表面几何动画，`transformOrigin` 为面板中心（`DIALOG_RECT` 400×300 → `"200px 150px"`），且 `origin.state.resolveCalls === 0`；② 标记面板 + 有触发源仍取中心（忽略触发源）；③ 标记面板退场幽灵复用中心 origin（复用现有「退场幽灵复用入场 origin」的装配）。装配方式：`buildSettingsOverlay()` + `stubRect(panel, DIALOG_RECT)` + `panel.setAttribute(...)`。
+- [x] `src/marker.js`：按 §2 冻结签名实现 4 个导出；`isCenterOriginSurface` 用 `nodeType === 1` + `getAttribute` 判定，读取异常一律 `false`；`centerGeometryFor` 用 `rect.width / 2`、`rect.height / 2`，`-0` 归一为 `+0`。
+- [x] `src/runtime.js`：`entryGeometryFor` 在 `readSurfaceRect` 成功后先判标记 → 直接 `return centerGeometryFor(rect)`（跳过 `resolveSource` 与 `fallbackMode` 的指针回退）；`exitGeometryFor` 在缓存未命中的路径里对 `original` 与 `rectElement` 任一命中标记 → 返回中心几何；更新 `geometryCache` 形状注释。
+- [x] `test/runtime.test.mjs`：新增 3 条用例——① 标记面板 + 无触发源（`origin.resolve` 返回 `null`、`fallbackMode: () => "fade"`）仍产生表面几何动画，`transformOrigin` 为面板中心（`DIALOG_RECT` 400×300 → `"200px 150px"`），且 `origin.state.resolveCalls === 0`；② 标记面板 + 有触发源仍取中心（忽略触发源）；③ 标记面板退场幽灵复用中心 origin（复用现有「退场幽灵复用入场 origin」的装配）。装配方式：`buildSettingsOverlay()` + `stubRect(panel, DIALOG_RECT)` + `panel.setAttribute(...)`。
 - **完成判据**：`node --test test/runtime.test.mjs` 通过。
 
 ### 3.2 设置插件：给设置面板打标记（节点内并行，依赖 §3.1 已完成）
 
 #### 3.2.1 实现与测试并行
 
-- [ ] **Agent A**：`packages/dsh-webui-transition-settings/src/contract.js` — 新增 §2 冻结的两个常量；`.../src/panel-marker.js` — 新增文件，按 §2 冻结签名实现 observer（`document.body` 上 `childList + subtree`；addedNodes 自身与后代匹配 `SETTINGS_PANEL_SELECTOR` 即打标；stop 断开 observer）；`.../src/browser.js` — 新增第 4 个 `ctx.effect`，名称按 §2。（依赖：§2 冻结签名）
-- [ ] **Agent B**：`test/contract.test.mjs` — 新增两包标记常量一致断言；`test/settings-plugin.test.mjs` — effect 数量 3→4 与名称清单更新；新增打标用例：apply 后向 `document.body` 插入 `buildSettingsOverlay()` → panel 带标记；插入非设置 dialog（`buildGlassPanel()`）→ 不打标；执行全部 cleanup 后再插入设置面板 → 不打标。（依赖：§2 冻结签名与 effect 名称）
+- [x] **Agent A**：`packages/dsh-webui-transition-settings/src/contract.js` — 新增 §2 冻结的两个常量；`.../src/panel-marker.js` — 新增文件，按 §2 冻结签名实现 observer（`document.body` 上 `childList + subtree`；addedNodes 自身与后代匹配 `SETTINGS_PANEL_SELECTOR` 即打标；stop 断开 observer）；`.../src/browser.js` — 新增第 4 个 `ctx.effect`，名称按 §2。（依赖：§2 冻结签名）
+- [x] **Agent B**：`test/contract.test.mjs` — 新增两包标记常量一致断言；`test/settings-plugin.test.mjs` — effect 数量 3→4 与名称清单更新；新增打标用例：apply 后向 `document.body` 插入 `buildSettingsOverlay()` → panel 带标记；插入非设置 dialog（`buildGlassPanel()`）→ 不打标；执行全部 cleanup 后再插入设置面板 → 不打标。（依赖：§2 冻结签名与 effect 名称）
 - **完成判据**：两人收敛后 `pnpm build && node --test test/contract.test.mjs test/settings-plugin.test.mjs` 通过（设置插件测试读取构建产物 `packages/.../client.js`）。
 
 ### 3.3 文档、构建产物与全量验证（线性）
 
 #### 3.3.1 文档 + 构建 + 全量测试
 
-- [ ] 根 `README.md` / `README.en.md`：效果表拆出「设置面板」行（正中心缩放、不依赖触发源、始终生效；其它 `role="dialog"` 行保留现状）；「原点感知」段补标记契约（表面所属插件可打 `data-dsh-transition-origin="center"`；主插件不认宿主属性）。
-- [ ] 设置包 `README.md` / `README.en.md`：「与主包的关系」补一句打标职责（设置插件给设置面板打中心缩放标记；主插件不依赖本插件也能运行）。
-- [ ] `AGENTS.md`：项目地图新增 `src/marker.js`、`packages/.../src/panel-marker.js`，测试说明补对应条目。
-- [ ] `pnpm build` 重新生成两份 `client.js`（nav-icon 无变化），逐条确认产物差异只有预期内容。
+- [x] 根 `README.md` / `README.en.md`：效果表拆出「设置面板」行（正中心缩放、不依赖触发源、始终生效；其它 `role="dialog"` 行保留现状）；「原点感知」段补标记契约（表面所属插件可打 `data-dsh-transition-origin="center"`；主插件不认宿主属性）。
+- [x] 设置包 `README.md` / `README.en.md`：「与主包的关系」补一句打标职责（设置插件给设置面板打中心缩放标记；主插件不依赖本插件也能运行）。
+- [x] `AGENTS.md`：项目地图新增 `src/marker.js`、`packages/.../src/panel-marker.js`，测试说明补对应条目。
+- [x] `pnpm build` 重新生成两份 `client.js`（nav-icon 无变化），逐条确认产物差异只有预期内容。
 - **完成判据**：`pnpm test` 全绿；`git status` 的改动文件 = §2 表格所列 + 两份 `client.js` 产物，无其它改动。
 
 ### 3.4 提交（线性）
 
 #### 3.4.1 一次提交
 
-- [ ] 只 `git add` §3.3 验证过的文件（含构建产物）；不带入工作区既有的 `COMPATIBLE_VERSION` 未提交改动；不提交本计划文档。
-- [ ] 一次 Conventional Commits 提交，提交信息 body 注明完成本计划节点（如 `plan: v1.0.0/settings-center-origin.md §3.1–3.3`）；不 push。
+- [x] 只 `git add` §3.3 验证过的文件（含构建产物）；不带入工作区既有的 `COMPATIBLE_VERSION` 未提交改动；不提交本计划文档。
+- [x] 一次 Conventional Commits 提交，提交信息 body 注明完成本计划节点（如 `plan: v1.0.0/settings-center-origin.md §3.1–3.3`）；不 push。
 - **完成判据**：`git log -1 --stat` 显示单次提交，文件清单与预期一致。
