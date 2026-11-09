@@ -44,6 +44,8 @@ var SETTINGS_KEY = "dsh.webui-transition.settings.v1";
 var SETTINGS_EVENT = "dsh-webui-transition/settings";
 var FALLBACK_MODES = Object.freeze(["fade", "pointer"]);
 var DEFAULT_SETTINGS = Object.freeze({ fallback: "fade" });
+var ORIGIN_MARKER_ATTRIBUTE = "data-dsh-transition-origin";
+var ORIGIN_MARKER_CENTER = "center";
 function defaults() {
   return { fallback: DEFAULT_SETTINGS.fallback };
 }
@@ -197,6 +199,73 @@ var en = {
   hint: "Fade only: no geometric animation, opacity only. Pointer origin: scale from the most recent pointer position."
 };
 
+// packages/dsh-webui-transition-settings/src/panel-marker.js
+var SETTINGS_PANEL_SELECTOR = '[role="dialog"][data-shortcut-modal="settings"]';
+function resolveDocument(options) {
+  if (options.document) return options.document;
+  try {
+    return typeof globalThis !== "undefined" && globalThis.document ? globalThis.document : null;
+  } catch (error) {
+    return null;
+  }
+}
+function resolveObserverCtor(options) {
+  if (typeof options.MutationObserver === "function") return options.MutationObserver;
+  try {
+    return typeof globalThis !== "undefined" && typeof globalThis.MutationObserver === "function" ? globalThis.MutationObserver : null;
+  } catch (error) {
+    return null;
+  }
+}
+function markAdded(node) {
+  if (!node || node.nodeType !== 1) return;
+  try {
+    if (node.matches(SETTINGS_PANEL_SELECTOR)) {
+      node.setAttribute(ORIGIN_MARKER_ATTRIBUTE, ORIGIN_MARKER_CENTER);
+    }
+    for (const panel of node.querySelectorAll(SETTINGS_PANEL_SELECTOR)) {
+      panel.setAttribute(ORIGIN_MARKER_ATTRIBUTE, ORIGIN_MARKER_CENTER);
+    }
+  } catch (error) {
+  }
+}
+function handleRecords(records) {
+  for (const record of records) {
+    try {
+      if (!record || record.type !== "childList" || !record.addedNodes) continue;
+      for (const node of Array.from(record.addedNodes)) markAdded(node);
+    } catch (error) {
+    }
+  }
+}
+function startPanelMarker(options = {}) {
+  const documentNode = resolveDocument(options);
+  const ObserverCtor = resolveObserverCtor(options);
+  const root = documentNode && documentNode.body;
+  if (!root || typeof ObserverCtor !== "function") return () => {
+  };
+  let observer = null;
+  try {
+    observer = new ObserverCtor(handleRecords);
+    observer.observe(root, { childList: true, subtree: true });
+  } catch (error) {
+    try {
+      if (observer) observer.disconnect();
+    } catch (disconnectError) {
+    }
+    return () => {
+    };
+  }
+  return function stop() {
+    if (!observer) return;
+    try {
+      observer.disconnect();
+    } catch (error) {
+    }
+    observer = null;
+  };
+}
+
 // packages/dsh-webui-transition-settings/src/browser.js
 var inject = ["slots", "locale"];
 var SECTION_ID = "webui-transition";
@@ -230,6 +299,10 @@ function apply(ctx) {
       () => ctx.slots.register({ name: "settings.section.icon", id: SECTION_ID }, NavIcon)
     ),
     "webui-transition-settings: nav icon"
+  );
+  ctx.effect(
+    () => startPanelMarker(),
+    "webui-transition-settings: settings panel origin marker"
   );
 }
 

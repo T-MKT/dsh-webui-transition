@@ -5,15 +5,19 @@
  * 该页的侧栏导航图标（`settings.section.icon`）与运行时文案。
  * 设置变更写 localStorage 后通过 Cordis 事件通知主插件（同标签页即时生效）；
  * 主插件不依赖本插件即可运行（读不到设置时用默认 fade）。
+ * 启动时另在 document.body 上挂 observer，给设置面板打表面级中心原点标记
+ * （`data-dsh-transition-origin="center"`），主插件据此以面板正中心缩放。
  *
  * 依据：.agents/plan/v0.3.0/origin-aware-and-settings.md §2.7 / §3.6.1（页面与文案）；
- * 导航图标见 dsh 0.2.2-alpha.3 的 `settings.section.icon` slot。
+ * 导航图标见 dsh 0.2.2-alpha.3 的 `settings.section.icon` slot；
+ * 打标见 .agents/plan/v1.0.0/settings-center-origin.md §2 / §3.2.1。
  */
 
 import { SETTINGS_EVENT, readSettings, writeSettings } from "./contract.js";
 import { createSettingsPage } from "./settings-page.js";
 import { NavIcon } from "./nav-icon.js";
 import { NS, zh, en } from "./locale.js";
+import { startPanelMarker } from "./panel-marker.js";
 
 export const inject = ["slots", "locale"];
 
@@ -50,5 +54,9 @@ export function apply(ctx) {
         ctx.slots.register({ name: "settings.section.icon", id: SECTION_ID }, NavIcon),
       ),
     "webui-transition-settings: nav icon",
+  );
+  ctx.effect(
+    () => startPanelMarker(),
+    "webui-transition-settings: settings panel origin marker",
   );
 }

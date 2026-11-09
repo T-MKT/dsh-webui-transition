@@ -11,6 +11,7 @@
 import { OBSERVED_ATTRIBUTES, SURFACE_DEFS } from "./defs.js";
 import { animationSpecsFor } from "./frames.js";
 import { createGate } from "./gate.js";
+import { centerGeometryFor, isCenterOriginSurface } from "./marker.js";
 import { geometryForSource } from "./origin.js";
 import { createPolicy } from "./policy.js";
 import { createSurfaceTracker } from "./tracker.js";
@@ -193,7 +194,8 @@ export function createTransitionRuntime(options = {}) {
   const origin = options.origin && typeof options.origin === "object" ? options.origin : null;
   const fallbackMode =
     typeof options.fallbackMode === "function" ? options.fallbackMode : () => "fade";
-  // 入场时缓存的几何（元素 → { originX, originY, translateX, translateY }），退场幽灵复用。
+  // 入场时缓存的几何（元素 → { originX, originY, translateX, translateY }，标记表面
+  // 的 translate 恒为 0），退场幽灵复用。
   let geometryCache = new WeakMap();
 
   // 规格只依赖「表面 + kind + 方向 + 几何」，入场与退场幽灵共用同一套拆分规则。
@@ -261,9 +263,11 @@ export function createTransitionRuntime(options = {}) {
   }
 
   // 入场几何：解析触发源 → 几何；猜不到且回退模式为 pointer 时用最近指针点；仍为空 → null。
+  // 带中心原点标记的表面（如设置面板）无条件取表面正中心，跳过触发源解析与回退。
   function entryGeometryFor(element, kind) {
     const rect = readSurfaceRect(element);
     if (!rect) return null;
+    if (isCenterOriginSurface(element)) return centerGeometryFor(rect);
     const distancePx = surfaceDefFor(kind).distancePx;
     const source = resolveSource(element);
     let geometry = source ? geometryForSource(source, rect, distancePx) : null;
@@ -282,6 +286,10 @@ export function createTransitionRuntime(options = {}) {
     if (cached) return cached;
     const rect = readSurfaceRect(rectElement);
     if (!rect) return null;
+    // 标记表面在缓存未命中时同样取中心几何（克隆体保留标记属性，故两处都判）。
+    if (isCenterOriginSurface(original) || isCenterOriginSurface(rectElement)) {
+      return centerGeometryFor(rect);
+    }
     const distancePx = surfaceDefFor(kind).distancePx;
     const documentNode = root && root.nodeType === 9 ? root : root && root.ownerDocument;
     let active = null;

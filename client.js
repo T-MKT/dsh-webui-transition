@@ -1033,6 +1033,28 @@
     };
   }
 
+  // src/marker.js
+  var ORIGIN_MARKER_ATTRIBUTE = "data-dsh-transition-origin";
+  var ORIGIN_MARKER_CENTER = "center";
+  function isCenterOriginSurface(element) {
+    if (!element || element.nodeType !== 1) return false;
+    try {
+      return element.getAttribute(ORIGIN_MARKER_ATTRIBUTE) === ORIGIN_MARKER_CENTER;
+    } catch (error) {
+      return false;
+    }
+  }
+  function centerGeometryFor(rect) {
+    const originX = rect.width / 2;
+    const originY = rect.height / 2;
+    return {
+      originX: originX === 0 ? 0 : originX,
+      originY: originY === 0 ? 0 : originY,
+      translateX: 0,
+      translateY: 0
+    };
+  }
+
   // src/tracker.js
   function classTokens(element) {
     const className = isElement(element) ? element.getAttribute("class") : null;
@@ -1394,6 +1416,7 @@
     function entryGeometryFor(element, kind) {
       const rect = readSurfaceRect(element);
       if (!rect) return null;
+      if (isCenterOriginSurface(element)) return centerGeometryFor(rect);
       const distancePx = surfaceDefFor2(kind).distancePx;
       const source = resolveSource(element);
       let geometry = source ? geometryForSource(source, rect, distancePx) : null;
@@ -1408,6 +1431,9 @@
       if (cached) return cached;
       const rect = readSurfaceRect(rectElement);
       if (!rect) return null;
+      if (isCenterOriginSurface(original) || isCenterOriginSurface(rectElement)) {
+        return centerGeometryFor(rect);
+      }
       const distancePx = surfaceDefFor2(kind).distancePx;
       const documentNode = root && root.nodeType === 9 ? root : root && root.ownerDocument;
       let active = null;

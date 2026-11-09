@@ -40,6 +40,7 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │   ├── gate.js                               # createGate：兼容性门卫（WAAPI / CSS animation / CSS transition）
 │   ├── settings.js                           # 主包侧设置契约：localStorage 读/清洗/写
 │   ├── origin.js                             # 交互捕获 / 触发源解析 / origin 几何
+│   ├── marker.js                             # 表面级中心原点标记契约 + 中心几何
 │   ├── frames.js                             # 纯帧函数：关键帧 + 动画规格拆分（含原点感知与伪元素玻璃）
 │   ├── runtime.js                            # createTransitionRuntime：观察 / 批量 / 入场 / 幽灵 / 清理
 │   └── browser.js                            # 浏览器入口：__ModuleLoader__.load 注册
@@ -55,7 +56,8 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │       ├── browser.js                        # factory 入口：inject/apply + settings.section / settings.section.icon 注册
 │       ├── nav-icon.js                       # 设置导航图标组件（pnpm build 从 outline.svg 生成，不手改）
 │       ├── settings-page.js                  # React 页面（SegmentedControl）
-│       ├── contract.js                       # 与主包重复的 key/event/default/modes + read/write
+│       ├── panel-marker.js                   # 观察 body：给设置面板打中心原点标记
+│       ├── contract.js                       # 与主包重复的 key/event/default/modes/标记常量 + read/write
 │       └── locale.js                         # zh/en 运行时文案
 ├── scripts/
 │   ├── build.mjs                             # 构建入口：先生成 nav-icon.js，再打两个 esbuild 产物
@@ -68,12 +70,12 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │   ├── gate.test.mjs
 │   ├── settings.test.mjs                     # 主包设置契约
 │   ├── origin.test.mjs                       # 触发源解析 / 闸门 / 新鲜度 / 几何
-│   ├── contract.test.mjs                     # 两包设置契约防漂移
+│   ├── contract.test.mjs                     # 两包设置契约与中心原点标记常量防漂移
 │   ├── frames.test.mjs
-│   ├── runtime.test.mjs
+│   ├── runtime.test.mjs                      # 观察 / 入场 / 幽灵 / 清理 / 中心原点标记表面
 │   ├── settings-page.test.mjs                # 设置页渲染 / 切换写 storage + emit
 │   ├── nav-icon.test.mjs                     # 设置导航图标渲染契约（生成组件）
-│   ├── settings-plugin.test.mjs              # 设置插件产物 / inject / slot 注册
+│   ├── settings-plugin.test.mjs              # 设置插件产物 / inject / slot 注册 / 设置面板打标
 │   └── bundle.test.mjs                       # 两个构建产物冒烟：classic 契约 + 冻结签名
 ├── locale/en.json / locale/zh.json           # 根包展示元信息（meta.title/description）
 ├── AGENTS.md

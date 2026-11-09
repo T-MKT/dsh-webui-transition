@@ -18,6 +18,7 @@ import {
   animateCalls,
   buildGlassPanel,
   buildMenu,
+  buildSettingsOverlay,
   computedStyle,
   createFrameScheduler,
   createMatchMediaMock,
@@ -32,6 +33,7 @@ import {
   settleAnimations,
 } from "./helpers/env.mjs";
 import { createGate } from "../src/gate.js";
+import { ORIGIN_MARKER_ATTRIBUTE, ORIGIN_MARKER_CENTER } from "../src/marker.js";
 import { createPolicy } from "../src/policy.js";
 import { createTransitionRuntime } from "../src/runtime.js";
 import { createSurfaceTracker } from "../src/tracker.js";
@@ -589,6 +591,81 @@ describe("runtime：原点感知与回退", () => {
     assert.ok(surfaceCall, "幽灵应播退场动画");
     assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN, "复用入场 origin");
     assert.equal(surfaceCall.keyframes[1].translate, MENU_TRANSLATE, "复用入场方向平移");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v1.0.0 中心原点标记表面：设置面板无条件以正中心缩放（v1.0.0 §3.1.1）
+// ---------------------------------------------------------------------------
+
+const CENTER_ORIGIN = "200px 150px"; // DIALOG_RECT 400×300 的中心
+const CENTER_TRANSLATE = "0px 0px";
+
+/** 标记设置面板装配：buildSettingsOverlay + 面板矩形 + 中心原点标记。 */
+function markSettingsPanel() {
+  const overlay = buildSettingsOverlay();
+  stubRect(overlay.panel, DIALOG_RECT);
+  overlay.panel.setAttribute(ORIGIN_MARKER_ATTRIBUTE, ORIGIN_MARKER_CENTER);
+  return overlay;
+}
+
+describe("runtime：中心原点标记表面", () => {
+  test("标记面板 + 无触发源：仍播表面几何动画，原点为面板中心且不解析触发源", async () => {
+    const harness = createHarness({
+      origin: createFakeOrigin({ source: null }),
+      fallbackMode: () => "fade",
+    });
+    const { overlay, panel } = markSettingsPanel();
+    document.body.appendChild(overlay);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const surfaceCall = animateCalls.find((call) => call.element === panel);
+    assert.ok(surfaceCall, "解析不到触发源时标记表面也应播表面几何动画");
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, CENTER_ORIGIN, "origin 为面板正中心");
+    assert.equal(surfaceCall.keyframes[0].translate, CENTER_TRANSLATE, "中心原点首帧无方向位移");
+    assert.equal(surfaceCall.keyframes[1].translate, "0 0", "末帧回到原位");
+    assert.equal(harness.origin.state.resolveCalls, 0, "标记表面跳过触发源解析");
+    assert.equal(harness.origin.state.pointCalls, 0, "标记表面不做指针回退");
+  });
+
+  test("标记面板 + 有触发源：忽略触发源，仍取面板中心", async () => {
+    const harness = createHarness({ origin: createFakeOrigin({ source: DIALOG_SOURCE }) });
+    const { overlay, panel } = markSettingsPanel();
+    document.body.appendChild(overlay);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const surfaceCall = animateCalls.find((call) => call.element === panel);
+    assert.ok(surfaceCall, "标记面板应播表面几何动画");
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, CENTER_ORIGIN, "触发源不参与标记表面");
+    assert.equal(surfaceCall.keyframes[0].translate, CENTER_TRANSLATE, "标记表面无方向位移");
+    assert.equal(harness.origin.state.resolveCalls, 0, "有触发源时同样不解析");
+  });
+
+  test("标记面板退场幽灵复用中心 origin", async () => {
+    const harness = createHarness({ origin: createFakeOrigin({ source: DIALOG_SOURCE }) });
+    const stage = document.createElement("div");
+    document.body.appendChild(stage);
+    const { overlay, panel } = markSettingsPanel();
+    stage.appendChild(overlay);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+    await settleAnimations(); // 结清入场
+    resetAnimationLog();
+
+    // 入场后把触发源换到别处：退场必须复用入场缓存的中心几何。
+    harness.origin.state.source = { kind: "element", rect: { left: 0, top: 0, width: 10, height: 10 } };
+    panel.remove();
+    await nextTask();
+
+    const ghost = document.querySelector("[data-dsh-transition-ghost]");
+    assert.ok(ghost, "标记面板退场应产生幽灵");
+    const surfaceCall = animateCalls.find((call) => call.element === ghost);
+    assert.ok(surfaceCall, "幽灵应播退场动画");
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, CENTER_ORIGIN, "幽灵复用中心 origin");
+    assert.equal(surfaceCall.keyframes[0].translate, "0 0", "退场首帧在原位");
+    assert.equal(surfaceCall.keyframes[1].translate, CENTER_TRANSLATE, "退场同样无方向位移");
   });
 });
 

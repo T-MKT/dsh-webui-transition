@@ -9,7 +9,7 @@
 
 为 DSH（DeepSeek Harness）Web GUI 补上两处开合过渡动画的第三方客户端插件：各级下拉菜单与设置面板。它是一个 dsh bundle，纯浏览器半区运行，不修改 dsh 源码、无第三方运行时依赖。
 
-v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素时，以「触发元素离弹层最近的边/点」为 `transform-origin` 缩放，并让位移方向从触发点指向弹层；退场复用入场缓存的 origin，朝触发点收回。猜不到触发源时按设置回退：**仅淡入**（默认）或**点击原点**。设置 UI 由同 bundle 内的独立插件 `@tak1208/dsh-webui-transition-settings` 提供（Settings → 过渡动画）。
+v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素时，以「触发元素离弹层最近的边/点」为 `transform-origin` 缩放，并让位移方向从触发点指向弹层；退场复用入场缓存的 origin，朝触发点收回。猜不到触发源时按设置回退：**仅淡入**（默认）或**点击原点**。v1.0.0 起设置面板改为**正中心缩放**：面板以自身正中心为 `transform-origin` 缩放 + 淡入，不依赖触发源（由设置插件在面板上打 `data-dsh-transition-origin="center"` 标记，主插件只识别标记）。设置 UI 由同 bundle 内的独立插件 `@tak1208/dsh-webui-transition-settings` 提供（Settings → 过渡动画）。
 
 ## 效果范围
 
@@ -18,9 +18,11 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 | 表面 | 语义选择器 | 入场 | 退场 |
 | --- | --- | --- | --- |
 | 各级下拉菜单（含设置内的模型菜单等） | `role="menu"` | 以触发源最近边/点为原点缩放（`.98`）+ 从触发侧起步 `4px`，默认约 150ms | 复用入场 origin，朝触发点收回 |
-| 设置面板与 `role="dialog"` 弹出面板（如 Agent Team 看板、上下文用量面板） | `role="dialog"`（可带遮罩 mask） | mask 淡入（约 180ms）；面板以触发源为原点缩放（`.98`）+ 方向位移 `12px`（约 220ms） | 镜像退场 |
+| 设置面板 | `role="dialog"` + `data-dsh-transition-origin="center"`（由设置插件打标） | 以面板正中心为原点缩放（`.98`）+ 淡入（约 220ms），不依赖触发源、始终生效 | 镜像退场 |
+| 其它 `role="dialog"` 弹出面板（如 Agent Team 看板、上下文用量面板） | `role="dialog"`（可带遮罩 mask） | mask 淡入（约 180ms）；面板以触发源为原点缩放（`.98`）+ 方向位移 `12px`（约 220ms） | 镜像退场 |
 
 - **原点感知**：触发源按优先级推断——DOM 邻接（子菜单 / 非 portal wrapper）→ `aria-controls` → `[aria-expanded="true"][aria-haspopup]`（24px 邻接闸门 + 1400px 距离上限）→ 最近指针目标（2.5s 内）→ 键盘焦点。推断不到时按设置回退。
+- **表面级原点标记**：表面所属插件可在表面元素上打 `data-dsh-transition-origin="center"`，主插件对该表面**无条件**以自身正中心为 `transform-origin`，跳过触发源推断与回退。当前只有设置插件给设置面板打该标记（标记由插件自己打；主插件不识别 `data-shortcut-modal`、`aria-modal` 等宿主属性）。
 - **回退模式**：`仅淡入`（默认，不做任何几何动画）或 `点击原点`（以最近一次指针位置为缩放原点）；两者都取不到时仍退化为仅淡入。
 - 时长与缓动优先读宿主 token（`--ds-transition-duration`、`--ds-transition-duration-fast`、`--ds-ease-in-out`），并做区间 clamp；缺省值即上表。
 - 关闭时宿主会把节点瞬时卸载，因此退场使用「幽灵副本」：克隆一份 `inert` 的副本插回原位，播完即删，不拦截交互、也不进入无障碍树。
@@ -101,8 +103,8 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 
 仓库是 pnpm workspace，两个包：
 
-- 根包 `@tak1208/dsh-webui-transition`：bundle + 主 client 插件。源码是 `src/` 下的 ESM 模块，一个文件一个职责：`defs.js`（常量与 `SURFACE_DEFS` 表面描述符）、`utils.js`（通用小工具）、`policy.js`（token / reduced-motion / 时长策略）、`tracker.js`（表面状态机与 DOM 分类）、`gate.js`（WAAPI / CSS animation / CSS transition 冲突门卫）、`settings.js`（localStorage 设置契约）、`origin.js`（交互捕获、触发源解析与 origin 几何）、`frames.js`（纯关键帧函数，含原点感知几何与伪元素玻璃拆分）、`runtime.js`（观察、批量、入场与退场幽灵）、`browser.js`（浏览器入口，注册到 `window.__ModuleLoader__`）。入口经 esbuild 打包为根目录的 classic iife 产物 `client.js`。
-- 设置包 `packages/dsh-webui-transition-settings`：独立 client 插件，`src/browser.js` 注册 `settings.section` 设置页与 `settings.section.icon` 导航图标（组件由 `pnpm build` 从 `assets/icons/outline.svg` 生成 `src/nav-icon.js`），`src/settings-page.js` 用 `@deepseek-ai/dsh-client-ui-primitives` 的 `SegmentedControl` 渲染，`src/contract.js` 与主包 `src/settings.js` 各自独立实现同一份设置契约（由 `test/contract.test.mjs` 防漂移）。构建产物是该包的 `client.js`（esbuild cjs 包进 `__ModuleLoader__.load` factory）。
+- 根包 `@tak1208/dsh-webui-transition`：bundle + 主 client 插件。源码是 `src/` 下的 ESM 模块，一个文件一个职责：`defs.js`（常量与 `SURFACE_DEFS` 表面描述符）、`utils.js`（通用小工具）、`policy.js`（token / reduced-motion / 时长策略）、`tracker.js`（表面状态机与 DOM 分类）、`gate.js`（WAAPI / CSS animation / CSS transition 冲突门卫）、`settings.js`（localStorage 设置契约）、`origin.js`（交互捕获、触发源解析与 origin 几何）、`marker.js`（表面级中心原点标记契约与中心几何）、`frames.js`（纯关键帧函数，含原点感知几何与伪元素玻璃拆分）、`runtime.js`（观察、批量、入场与退场幽灵）、`browser.js`（浏览器入口，注册到 `window.__ModuleLoader__`）。入口经 esbuild 打包为根目录的 classic iife 产物 `client.js`。
+- 设置包 `packages/dsh-webui-transition-settings`：独立 client 插件，`src/browser.js` 注册 `settings.section` 设置页与 `settings.section.icon` 导航图标（组件由 `pnpm build` 从 `assets/icons/outline.svg` 生成 `src/nav-icon.js`），`src/settings-page.js` 用 `@deepseek-ai/dsh-client-ui-primitives` 的 `SegmentedControl` 渲染，`src/contract.js` 与主包 `src/settings.js` 各自独立实现同一份设置契约（由 `test/contract.test.mjs` 防漂移），`src/panel-marker.js` 观察 `document.body` 给设置面板打中心原点标记。构建产物是该包的 `client.js`（esbuild cjs 包进 `__ModuleLoader__.load` factory）。
 
 两个 `client.js` 都是构建产物，由 `pnpm build` 生成，**不要手改**；改实现请改 `src/` 后重新构建。
 
