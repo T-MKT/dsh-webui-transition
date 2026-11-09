@@ -93,40 +93,40 @@ export function centerGeometryFor(rect) // → { originX: number, originY: numbe
 
 #### 3.1.1 策略表与 origin 并行收敛
 
-- [ ] **Agent A**：`src/defs.js` — 删 menu / listbox / dialog / mask 的 `distancePx`，更新文件头「冻结策略表」注释；`src/policy.js` — `timing()` 删 `distancePx: def.distancePx`；`test/policy.test.mjs` — 「返回 SURFACE_DEFS 冻结的位移 / 缩放 / 透明度起点」用例改为只断言 `scaleFrom` / `opacityFrom`，删所有 `distancePx` 断言。写入范围：3 文件。（依赖：无）
-- [ ] **Agent B**：`src/origin.js` — `geometryForSource(source, surfaceRect)` 删第三参与 `dx/dy/length/translateX/translateY` 计算，返回 `{ originX, originY }`，同步更新模块头第 2 条与锚点注释；`src/marker.js` — `centerGeometryFor` 返回 `{ originX, originY }`；`test/origin.test.mjs` — 重写第 7 节 `geometryForSource`：删第三参，逐用例保留投影/clamp 断言，删全部 translate 断言（含对角 clamp 的单位向量用例改为只断言 origin）。写入范围：3 文件。（依赖：§2 冻结签名）
+- [x] **Agent A**：`src/defs.js` — 删 menu / listbox / dialog / mask 的 `distancePx`，更新文件头「冻结策略表」注释；`src/policy.js` — `timing()` 删 `distancePx: def.distancePx`；`test/policy.test.mjs` — 「返回 SURFACE_DEFS 冻结的位移 / 缩放 / 透明度起点」用例改为只断言 `scaleFrom` / `opacityFrom`，删所有 `distancePx` 断言。写入范围：3 文件。（依赖：无）
+- [x] **Agent B**：`src/origin.js` — `geometryForSource(source, surfaceRect)` 删第三参与 `dx/dy/length/translateX/translateY` 计算，返回 `{ originX, originY }`，同步更新模块头第 2 条与锚点注释；`src/marker.js` — `centerGeometryFor` 返回 `{ originX, originY }`；`test/origin.test.mjs` — 重写第 7 节 `geometryForSource`：删第三参，逐用例保留投影/clamp 断言，删全部 translate 断言（含对角 clamp 的单位向量用例改为只断言 origin）。写入范围：3 文件。（依赖：§2 冻结签名）
 - **完成判据**：两人收敛后 `node --test test/policy.test.mjs test/origin.test.mjs` 通过。
 
 ### 3.2 帧与动画规格（线性，依赖 §3.1）
 
 #### 3.2.1 `src/frames.js` 与帧测试
 
-- [ ] `src/frames.js`：删 `translateValue`；`geometryValuesFor` 去 `distancePx`；`geometryKeyframesFor` 删两条 `translate` 赋值；`keyframesFor` / `exitKeyframesFor` 的非 splitFade 分支删 `translate`；`animationSpecsFor` 的 timing 快照删 `distancePx`；更新文件头与各函数注释（几何帧 = `transformOrigin` + `scale` + 可选 `boxShadow`）。
-- [ ] `test/frames.test.mjs`：`MENU_TIMING` / `DIALOG_TIMING` / `MASK_TIMING` 去 `distancePx`；`MENU_GEOMETRY` / `DIALOG_GEOMETRY` / `MASK_GEOMETRY` 去 translate；全部期望帧删 `translate`（含 menu 无子级回退、伪元素玻璃 4 处、mask geometry 用例：非空时只剩 `transformOrigin`）；`{ distancePx: NaN }` 回退用例改成 `{ scaleFrom: NaN }`。
+- [x] `src/frames.js`：删 `translateValue`；`geometryValuesFor` 去 `distancePx`；`geometryKeyframesFor` 删两条 `translate` 赋值；`keyframesFor` / `exitKeyframesFor` 的非 splitFade 分支删 `translate`；`animationSpecsFor` 的 timing 快照删 `distancePx`；更新文件头与各函数注释（几何帧 = `transformOrigin` + `scale` + 可选 `boxShadow`）。
+- [x] `test/frames.test.mjs`：`MENU_TIMING` / `DIALOG_TIMING` / `MASK_TIMING` 去 `distancePx`；`MENU_GEOMETRY` / `DIALOG_GEOMETRY` / `MASK_GEOMETRY` 去 translate；全部期望帧删 `translate`（含 menu 无子级回退、伪元素玻璃 4 处、mask geometry 用例：非空时只剩 `transformOrigin`）；`{ distancePx: NaN }` 回退用例改成 `{ scaleFrom: NaN }`。
 - **完成判据**：`node --test test/frames.test.mjs` 通过。
 
 ### 3.3 门卫与运行时（节点内并行，依赖 §3.2）
 
 #### 3.3.1 门卫与 runtime 并行收敛
 
-- [ ] **Agent A**：`src/gate.js` — `animatedPropertiesFor`：splitFade → `["scale"]`（`animateShadow` 时加 `"box-shadow"`），非 splitFade → `["opacity"]`，更新门卫 4 注释；`test/gate.test.mjs` — 复核既有用例（mask 的 `translate` 放行、menu 的 `box-shadow` 拒绝、dialog 的 `opacity`/`all` 用例），新增「dialog 上内联 `transition: translate .2s` 放行（插件不再动画 translate）」。写入范围：2 文件。（依赖：§2 冻结签名）
-- [ ] **Agent B**：`src/runtime.js` — 删 `entryGeometryFor` / `exitGeometryFor` 里的 `distancePx` 读取与三处 `geometryForSource(..., distancePx)` 传参，更新 `geometryCache` 注释的形状；`test/runtime.test.mjs` — 删 `MENU_TRANSLATE` / `DIALOG_TRANSLATE` 常量与所有相关断言（含前一份计划 `centerGeometryFor` 用例里的 `translateX/translateY` 断言），origin 入场 / pointer 回退 / 幽灵复用 / 伪玻璃用例改为只断言 `transformOrigin` 与 `scale`。写入范围：2 文件。（依赖：§2 冻结签名）
+- [x] **Agent A**：`src/gate.js` — `animatedPropertiesFor`：splitFade → `["scale"]`（`animateShadow` 时加 `"box-shadow"`），非 splitFade → `["opacity"]`，更新门卫 4 注释；`test/gate.test.mjs` — 复核既有用例（mask 的 `translate` 放行、menu 的 `box-shadow` 拒绝、dialog 的 `opacity`/`all` 用例），新增「dialog 上内联 `transition: translate .2s` 放行（插件不再动画 translate）」。写入范围：2 文件。（依赖：§2 冻结签名）
+- [x] **Agent B**：`src/runtime.js` — 删 `entryGeometryFor` / `exitGeometryFor` 里的 `distancePx` 读取与三处 `geometryForSource(..., distancePx)` 传参，更新 `geometryCache` 注释的形状；`test/runtime.test.mjs` — 删 `MENU_TRANSLATE` / `DIALOG_TRANSLATE` 常量与所有相关断言（含前一份计划 `centerGeometryFor` 用例里的 `translateX/translateY` 断言），origin 入场 / pointer 回退 / 幽灵复用 / 伪玻璃用例改为只断言 `transformOrigin` 与 `scale`。写入范围：2 文件。（依赖：§2 冻结签名）
 - **完成判据**：两人收敛后 `node --test test/gate.test.mjs test/runtime.test.mjs` 通过。
 
 ### 3.4 文档与全量验证（线性）
 
 #### 3.4.1 文档 + 残留校验 + 构建 + 全量测试
 
-- [ ] 根 `README.md` / `README.en.md`：效果表两条去 `4px` / `12px` 与「从触发侧起步 / 朝触发点收回」；origin-aware 段删「位移方向从触发点指向弹层 / 朝触发点收回」；伪元素玻璃段「表面只做位移与阴影」→「表面只做缩放与阴影」。
-- [ ] 设置包 `README.md` / `README.en.md`：`pointer` 回退删「朝点击位置做方向位移」（缩放原点语义保留）。
-- [ ] 残留校验：`grep -rn "distancePx\|translateX\|translateY\|translate:" src packages/dsh-webui-transition-settings/src test` 无输出；`grep -rn "translate" client.js packages/dsh-webui-transition-settings/client.js` 无输出（构建产物同样干净）。
-- [ ] `pnpm build` 重新生成两份 `client.js`；`pnpm test` 全绿。
+- [x] 根 `README.md` / `README.en.md`：效果表两条去 `4px` / `12px` 与「从触发侧起步 / 朝触发点收回」；origin-aware 段删「位移方向从触发点指向弹层 / 朝触发点收回」；伪元素玻璃段「表面只做位移与阴影」→「表面只做缩放与阴影」。
+- [x] 设置包 `README.md` / `README.en.md`：`pointer` 回退删「朝点击位置做方向位移」（缩放原点语义保留）。
+- [x] 残留校验：`grep -rn "distancePx\|translateX\|translateY\|translate:" src packages/dsh-webui-transition-settings/src test` 无输出；`grep -rn "translate" client.js packages/dsh-webui-transition-settings/client.js` 无输出（构建产物同样干净）。
+- [x] `pnpm build` 重新生成两份 `client.js`；`pnpm test` 全绿。
 - **完成判据**：上述两条 grep 为空 + `pnpm test` 通过 + `git status` 改动文件 = §2 表格 + 两份 `client.js` 产物，无其它改动。
 
 ### 3.5 提交（线性）
 
 #### 3.5.1 一次提交
 
-- [ ] 只 `git add` §3.4 验证过的文件（含构建产物）。
-- [ ] 一次 Conventional Commits 提交，提交信息 body 注明完成本计划节点与前置计划（如 `plan: v1.0.0/remove-displacement.md §3.1–3.4（依赖 settings-center-origin）`）；不 push。
+- [x] 只 `git add` §3.4 验证过的文件（含构建产物）。
+- [x] 一次 Conventional Commits 提交，提交信息 body 注明完成本计划节点与前置计划（如 `plan: v1.0.0/remove-displacement.md §3.1–3.4（依赖 settings-center-origin）`）；不 push。
 - **完成判据**：`git log -1 --stat` 显示单次提交，文件清单与预期一致。
