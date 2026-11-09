@@ -2,7 +2,7 @@
  * src/frames.js — 纯帧函数：关键帧构造 + 动画规格拆分。
  *
  * 只依赖 `SURFACE_DEFS` 与计算样式，不写 DOM、不创建动画、不做门卫。
- * `splitFade` / `animateShadow` / `distancePx` 等策略一律读 `SURFACE_DEFS[kind]`，
+ * `splitFade` / `animateShadow` 等策略一律读 `SURFACE_DEFS[kind]`，
  * 不再出现 `kind === "menu" || kind === "listbox"` 这类硬编码分支
  * （.plan/v0.2.0/plan-b-rewrite.md §3.6，冻结签名见 §4）。
  *
@@ -12,8 +12,8 @@
  * 直接子级 opacity + 伪元素自身 opacity（后者由 runtime 用 WAAPI pseudoElement 播放）。
  *
  * v0.3.0 追加「原点感知」几何（.agents/plan/v0.3.0/origin-aware-and-settings.md §3.3）：
- * 几何帧接受 `geometry = { originX, originY, translateX, translateY }`，写
- * `transformOrigin` 与方向平移；geometry 为空时不做表面几何动画（仅淡入）。
+ * 几何帧接受 `geometry = { originX, originY }`，写 `transformOrigin` 与缩放；
+ * geometry 为空时不做表面几何动画（仅淡入）。
  */
 
 import { SURFACE_DEFS } from "./defs.js";
@@ -29,7 +29,6 @@ function surfaceDefFor(kind) {
 function geometryValuesFor(def, timing) {
   const source = timing && typeof timing === "object" ? timing : {};
   return {
-    distancePx: Number.isFinite(source.distancePx) ? source.distancePx : def.distancePx,
     scaleFrom: Number.isFinite(source.scaleFrom) ? source.scaleFrom : def.scaleFrom,
     opacityFrom: Number.isFinite(source.opacityFrom) ? source.opacityFrom : def.opacityFrom,
   };
@@ -44,11 +43,7 @@ function originValue(geometry) {
   return px(geometry.originX) + " " + px(geometry.originY);
 }
 
-function translateValue(geometry) {
-  return px(geometry.translateX) + " " + px(geometry.translateY);
-}
-
-// 表面级几何帧（transform-origin + 方向平移 + 缩放 + 可选 boxShadow），不含 opacity：
+// 表面级几何帧（transform-origin + 缩放 + 可选 boxShadow），不含 opacity：
 // splitFade 表面与伪元素玻璃表面共用。direction 为 "out" 时是入场帧的镜像。
 // geometry 为空（无法推断触发源且回退为仅淡入）或浏览器不支持独立 transform 时返回 []。
 function geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out, geometry) {
@@ -58,8 +53,6 @@ function geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, ou
   const origin = originValue(geometry);
   const first = { transformOrigin: origin };
   const last = { transformOrigin: origin };
-  first.translate = out ? "0 0" : translateValue(geometry);
-  last.translate = out ? translateValue(geometry) : "0 0";
   if (values.scaleFrom !== 1) {
     first.scale = out ? "1" : String(values.scaleFrom);
     last.scale = out ? String(values.scaleFrom) : "1";
@@ -155,9 +148,8 @@ export function fadeKeyframesFor(direction, opacity) {
 }
 
 // 入场关键帧（§3.6 + v0.3.0 原点感知）：
-// - splitFade 表面只写几何（transform-origin/translate/scale）+ 可选阴影淡入，不写 opacity；
-// - 非 splitFade 表面维持整体关键帧（opacity [+ 几何]；mask 的 distancePx 为 0，
-//   自然没有位移）。
+// - splitFade 表面只写几何（transform-origin/scale）+ 可选阴影淡入，不写 opacity；
+// - 非 splitFade 表面维持整体关键帧（opacity [+ 几何]）。
 // geometry 为空时：splitFade 表面无表面帧；非 splitFade 表面只出 opacity 帧（仅淡入）。
 export function keyframesFor(kind, timing, independentTransforms, boxShadow = null, geometry = null) {
   const def = surfaceDefFor(kind);
@@ -173,8 +165,6 @@ export function keyframesFor(kind, timing, independentTransforms, boxShadow = nu
       const origin = originValue(geometry);
       first.transformOrigin = origin;
       last.transformOrigin = origin;
-      first.translate = translateValue(geometry);
-      last.translate = "0 0";
       if (values.scaleFrom !== 1) {
         first.scale = String(values.scaleFrom);
         last.scale = "1";
@@ -203,8 +193,6 @@ export function exitKeyframesFor(kind, timing, independentTransforms, boxShadow 
       const origin = originValue(geometry);
       first.transformOrigin = origin;
       last.transformOrigin = origin;
-      first.translate = "0 0";
-      last.translate = translateValue(geometry);
       if (values.scaleFrom !== 1) {
         first.scale = "1";
         last.scale = String(values.scaleFrom);
@@ -235,7 +223,6 @@ export function animationSpecsFor(surface, kind, direction, independentTransform
     options && typeof options.computedStyle === "function" ? options.computedStyle : defaultComputedStyle;
   const geometry = options && options.geometry ? options.geometry : null;
   const timing = {
-    distancePx: def.distancePx,
     scaleFrom: def.scaleFrom,
     opacityFrom: def.opacityFrom,
   };

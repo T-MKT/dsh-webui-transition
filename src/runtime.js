@@ -8,7 +8,7 @@
  * 旧名 `createMotionRuntime` 不保留（AGENTS.md：不保留向后兼容性）。
  */
 
-import { OBSERVED_ATTRIBUTES, SURFACE_DEFS } from "./defs.js";
+import { OBSERVED_ATTRIBUTES } from "./defs.js";
 import { animationSpecsFor } from "./frames.js";
 import { createGate } from "./gate.js";
 import { centerGeometryFor, isCenterOriginSurface } from "./marker.js";
@@ -194,8 +194,7 @@ export function createTransitionRuntime(options = {}) {
   const origin = options.origin && typeof options.origin === "object" ? options.origin : null;
   const fallbackMode =
     typeof options.fallbackMode === "function" ? options.fallbackMode : () => "fade";
-  // 入场时缓存的几何（元素 → { originX, originY, translateX, translateY }，标记表面
-  // 的 translate 恒为 0），退场幽灵复用。
+  // 入场时缓存的几何（元素 → { originX, originY }），退场幽灵复用。
   let geometryCache = new WeakMap();
 
   // 规格只依赖「表面 + kind + 方向 + 几何」，入场与退场幽灵共用同一套拆分规则。
@@ -253,10 +252,6 @@ export function createTransitionRuntime(options = {}) {
     }
   }
 
-  function surfaceDefFor(kind) {
-    return SURFACE_DEFS[kind] || SURFACE_DEFS.menu;
-  }
-
   function pointSource(point) {
     if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
     return { kind: "point", x: point.x, y: point.y };
@@ -264,16 +259,15 @@ export function createTransitionRuntime(options = {}) {
 
   // 入场几何：解析触发源 → 几何；猜不到且回退模式为 pointer 时用最近指针点；仍为空 → null。
   // 带中心原点标记的表面（如设置面板）无条件取表面正中心，跳过触发源解析与回退。
-  function entryGeometryFor(element, kind) {
+  function entryGeometryFor(element) {
     const rect = readSurfaceRect(element);
     if (!rect) return null;
     if (isCenterOriginSurface(element)) return centerGeometryFor(rect);
-    const distancePx = surfaceDefFor(kind).distancePx;
     const source = resolveSource(element);
-    let geometry = source ? geometryForSource(source, rect, distancePx) : null;
+    let geometry = source ? geometryForSource(source, rect) : null;
     if (!geometry && fallbackModeValue() === "pointer") {
       const point = pointSource(lastPointerPoint());
-      if (point) geometry = geometryForSource(point, rect, distancePx);
+      if (point) geometry = geometryForSource(point, rect);
     }
     return geometry;
   }
@@ -281,7 +275,7 @@ export function createTransitionRuntime(options = {}) {
   // 退场几何：优先入场缓存；否则用当前 activeElement（表面外且连接）作 element source，
   // 再按回退模式用最近指针点；都没有 → null。rectElement 是读取矩形的元素
   // （幽灵场景传克隆体，原表面此时已脱离文档、矩形为 0）。
-  function exitGeometryFor(original, kind, rectElement) {
+  function exitGeometryFor(original, rectElement) {
     const cached = geometryCache.get(original);
     if (cached) return cached;
     const rect = readSurfaceRect(rectElement);
@@ -290,7 +284,6 @@ export function createTransitionRuntime(options = {}) {
     if (isCenterOriginSurface(original) || isCenterOriginSurface(rectElement)) {
       return centerGeometryFor(rect);
     }
-    const distancePx = surfaceDefFor(kind).distancePx;
     const documentNode = root && root.nodeType === 9 ? root : root && root.ownerDocument;
     let active = null;
     try {
@@ -306,13 +299,13 @@ export function createTransitionRuntime(options = {}) {
     ) {
       const activeRect = readSurfaceRect(active);
       if (activeRect) {
-        const geometry = geometryForSource({ kind: "element", rect: activeRect }, rect, distancePx);
+        const geometry = geometryForSource({ kind: "element", rect: activeRect }, rect);
         if (geometry) return geometry;
       }
     }
     if (fallbackModeValue() === "pointer") {
       const point = pointSource(lastPointerPoint());
-      if (point) return geometryForSource(point, rect, distancePx);
+      if (point) return geometryForSource(point, rect);
     }
     return null;
   }
@@ -436,7 +429,7 @@ export function createTransitionRuntime(options = {}) {
     if (!timing || !(timing.durationMs > 0)) return;
 
     // 原点感知：解析触发源 → 几何；非空则缓存供退场幽灵复用。
-    const geometry = entryGeometryFor(element, intent.kind);
+    const geometry = entryGeometryFor(element);
     if (geometry) geometryCache.set(element, geometry);
 
     const specs = specsFor(element, intent.kind, "in", geometry);
@@ -505,7 +498,7 @@ export function createTransitionRuntime(options = {}) {
       if (!timing || !(timing.durationMs > 0)) continue;
       // 退场几何：优先入场缓存；否则用 activeElement / 指针回退。矩形从克隆体读取
       // （原表面此时已脱离文档，getBoundingClientRect 为 0）。
-      const geometry = exitGeometryFor(surface.element, surface.kind, target);
+      const geometry = exitGeometryFor(surface.element, target);
       const specs = specsFor(target, surface.kind, "out", geometry);
       for (const spec of specs) {
         const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);

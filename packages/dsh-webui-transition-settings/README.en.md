@@ -19,7 +19,7 @@ Optional settings plugin for `@tak1208/dsh-webui-transition`. It adds a **Transi
 | Fallback without an anchor | `Fade only` / `Pointer origin` | `Fade only` | How an overlay enters when the trigger element cannot be inferred |
 
 - **Fade only** (`fade`): no geometric animation for this surface, opacity only.
-- **Pointer origin** (`pointer`): scale from the most recent pointer position and translate towards it; when no pointer position is available it still degrades to fade only.
+- **Pointer origin** (`pointer`): scale from the most recent pointer position; when no pointer position is available it still degrades to fade only.
 
 ## Storage
 

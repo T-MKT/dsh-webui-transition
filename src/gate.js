@@ -95,21 +95,19 @@ export function createGate(options = {}) {
   // 门卫 4（v0.2.0 新增）：宿主 CSS transition 冲突（§3.5）
   //
   // 属性集合由 SURFACE_DEFS[kind] 决定，与我们实际会动画的属性保持一致：
-  // - splitFade: true（menu/listbox）→ translate、scale，animateShadow 为 true 时加 box-shadow，
+  // - splitFade: true（menu/listbox）→ scale，animateShadow 为 true 时加 box-shadow，
   //   不写 opacity（透明度下沉到直接元素子级，由子级动画负责）；
-  // - splitFade: false → opacity，distancePx !== 0 时加 translate。
+  // - splitFade: false → opacity。
   // -------------------------------------------------------------------------
   function animatedPropertiesFor(kind) {
     const surface = SURFACE_DEFS[kind];
     const definition = surface && typeof surface === "object" ? surface : SURFACE_DEFS.menu;
     if (definition.splitFade) {
-      const properties = ["translate", "scale"];
+      const properties = ["scale"];
       if (definition.animateShadow) properties.push("box-shadow");
       return properties;
     }
-    const properties = ["opacity"];
-    if (definition.distancePx !== 0) properties.push("translate");
-    return properties;
+    return ["opacity"];
   }
 
   // 读取 computed style 长属性：优先驼峰属性，其次 getPropertyValue（kebab-case）。

@@ -22,15 +22,13 @@ export function isCenterOriginSurface(element) {
   }
 }
 
-// 表面矩形 → 中心 origin 几何：形状与 origin.js 的 geometry 一致，平移恒为 0。
-// 统一 -0 → +0，避免深比较把方向上的零当成差异。
+// 表面矩形 → 中心 origin 几何：形状与 origin.js 的 geometry 一致。
+// 统一 -0 → +0，避免深比较把零坐标当成差异。
 export function centerGeometryFor(rect) {
   const originX = rect.width / 2;
   const originY = rect.height / 2;
   return {
     originX: originX === 0 ? 0 : originX,
     originY: originY === 0 ? 0 : originY,
-    translateX: 0,
-    translateY: 0,
   };
 }

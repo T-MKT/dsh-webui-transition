@@ -9,7 +9,7 @@
 
 为 DSH（DeepSeek Harness）Web GUI 补上两处开合过渡动画的第三方客户端插件：各级下拉菜单与设置面板。它是一个 dsh bundle，纯浏览器半区运行，不修改 dsh 源码、无第三方运行时依赖。
 
-v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素时，以「触发元素离弹层最近的边/点」为 `transform-origin` 缩放，并让位移方向从触发点指向弹层；退场复用入场缓存的 origin，朝触发点收回。猜不到触发源时按设置回退：**仅淡入**（默认）或**点击原点**。v1.0.0 起设置面板改为**正中心缩放**：面板以自身正中心为 `transform-origin` 缩放 + 淡入，不依赖触发源（由设置插件在面板上打 `data-dsh-transition-origin="center"` 标记，主插件只识别标记）。设置 UI 由同 bundle 内的独立插件 `@tak1208/dsh-webui-transition-settings` 提供（Settings → 过渡动画）。
+v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素时，以「触发元素离弹层最近的边/点」为 `transform-origin` 缩放；退场复用入场缓存的 origin。猜不到触发源时按设置回退：**仅淡入**（默认）或**点击原点**。v1.0.0 起设置面板改为**正中心缩放**：面板以自身正中心为 `transform-origin` 缩放 + 淡入，不依赖触发源（由设置插件在面板上打 `data-dsh-transition-origin="center"` 标记，主插件只识别标记）。设置 UI 由同 bundle 内的独立插件 `@tak1208/dsh-webui-transition-settings` 提供（Settings → 过渡动画）。
 
 ## 效果范围
 
@@ -17,9 +17,9 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 
 | 表面 | 语义选择器 | 入场 | 退场 |
 | --- | --- | --- | --- |
-| 各级下拉菜单（含设置内的模型菜单等） | `role="menu"` | 以触发源最近边/点为原点缩放（`.98`）+ 从触发侧起步 `4px`，默认约 150ms | 复用入场 origin，朝触发点收回 |
+| 各级下拉菜单（含设置内的模型菜单等） | `role="menu"` | 以触发源最近边/点为原点缩放（`.98`）+ 淡入，默认约 150ms | 复用入场 origin，镜像退场 |
 | 设置面板 | `role="dialog"` + `data-dsh-transition-origin="center"`（由设置插件打标） | 以面板正中心为原点缩放（`.98`）+ 淡入（约 220ms），不依赖触发源、始终生效 | 镜像退场 |
-| 其它 `role="dialog"` 弹出面板（如 Agent Team 看板、上下文用量面板） | `role="dialog"`（可带遮罩 mask） | mask 淡入（约 180ms）；面板以触发源为原点缩放（`.98`）+ 方向位移 `12px`（约 220ms） | 镜像退场 |
+| 其它 `role="dialog"` 弹出面板（如 Agent Team 看板、上下文用量面板） | `role="dialog"`（可带遮罩 mask） | mask 淡入（约 180ms）；面板以触发源为原点缩放（`.98`）+ 淡入（约 220ms） | 镜像退场 |
 
 - **原点感知**：触发源按优先级推断——DOM 邻接（子菜单 / 非 portal wrapper）→ `aria-controls` → `[aria-expanded="true"][aria-haspopup]`（24px 邻接闸门 + 1400px 距离上限）→ 最近指针目标（2.5s 内）→ 键盘焦点。推断不到时按设置回退。
 - **表面级原点标记**：表面所属插件可在表面元素上打 `data-dsh-transition-origin="center"`，主插件对该表面**无条件**以自身正中心为 `transform-origin`，跳过触发源推断与回退。当前只有设置插件给设置面板打该标记（标记由插件自己打；主插件不识别 `data-shortcut-modal`、`aria-modal` 等宿主属性）。
@@ -95,7 +95,7 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 - 覆盖范围依赖宿主语义 DOM（`role="menu"`、`role="dialog"` + `[data-shortcut-modal="settings"]`）；宿主改动语义结构会影响覆盖面。
 - 触发源推断是启发式的：保留 2.5s 新鲜度、24px 邻接闸门与 1400px 距离上限；无法确认时宁可走回退，不猜。
 - 玻璃表面的 `backdrop-filter`（如菜单的 `.material` 层）在过渡期间保持模糊：菜单的淡入淡出下沉到直接子级、退场幽灵不再剥离 `backdrop-filter`，因此入场/退场动画全程都在采样页面背景。
-- 玻璃层在 `::before` / `::after` 伪元素上的表面（当前宿主里是 Agent Team 看板）：插件改为动画伪元素自身的 opacity、表面只做位移与阴影，因此动画期间模糊保持；浏览器不支持 WAAPI `pseudoElement` 选项时（Chrome/Edge 之外的旧实现），该玻璃层不参与淡入淡出，但模糊仍全程有效。玻璃层在元素自身上的面板（如上下文用量面板）维持原有的整体淡入。
+- 玻璃层在 `::before` / `::after` 伪元素上的表面（当前宿主里是 Agent Team 看板）：插件改为动画伪元素自身的 opacity、表面只做缩放与阴影，因此动画期间模糊保持；浏览器不支持 WAAPI `pseudoElement` 选项时（Chrome/Edge 之外的旧实现），该玻璃层不参与淡入淡出，但模糊仍全程有效。玻璃层在元素自身上的面板（如上下文用量面板）维持原有的整体淡入。
 - 菜单容器的 `box-shadow`（宿主 elevation 阴影）随动画同步淡入/淡出，不会先出现「只有阴影的轮廓」，也不会在内容淡完后残留阴影。
 - 菜单的直接子元素若自带宿主 CSS animation，插件会短暂覆盖其 `opacity`（动画结束即释放填充态）；只影响宿主在子元素上已有 `opacity` 动画的极端情况。
 

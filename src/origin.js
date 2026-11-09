@@ -6,7 +6,7 @@
  *    交互（事件时刻的坐标与元素矩形），并为动画表面解析触发源，优先级为
  *    DOM 邻接（子菜单 / 非 portal wrapper）→ aria-controls → 展开态扫描（邻接闸门）
  *    → 最近指针目标 → 键盘 activeElement / 最近 keydown → null。
- * 2. `geometryForSource`：把触发源换算成表面内的 transform-origin 与方向平移。
+ * 2. `geometryForSource`：把触发源换算成表面内的 transform-origin。
  *
  * 矩形一律在事件时刻经元素自身的 `getBoundingClientRect()` 读取，元素随后卸载
  * 不影响解析；布局 API 缺失 / 异常 / 零尺寸时按「无触发源」处理（无法确认时
@@ -461,12 +461,12 @@ export function createInteractionTracker(options = {}) {
 // geometryForSource
 // ---------------------------------------------------------------------------
 
-// 统一 -0 → +0，避免深比较把方向上的零当成差异。
+// 统一 -0 → +0，避免深比较把零坐标当成差异。
 function normalizeZero(value) {
   return value === 0 ? 0 : value;
 }
 
-export function geometryForSource(source, surfaceRect, distancePx) {
+export function geometryForSource(source, surfaceRect) {
   try {
     if (!source || (source.kind !== "element" && source.kind !== "point")) return null;
     const box = toBox(surfaceRect);
@@ -500,16 +500,7 @@ export function geometryForSource(source, surfaceRect, distancePx) {
     const originX = normalizeZero(clampNumber(anchorX - box.left, 0, box.width));
     const originY = normalizeZero(clampNumber(anchorY - box.top, 0, box.height));
 
-    // 平移方向 = 由表面中心指向 origin，长度 = distancePx；零向量 → 不平移。
-    // distancePx 为正时入场首帧落在 origin 一侧（从触发侧起步），退场时收回 origin 一侧。
-    const dx = originX - box.width / 2;
-    const dy = originY - box.height / 2;
-    const length = Math.sqrt(dx * dx + dy * dy);
-    const distance = typeof distancePx === "number" && Number.isFinite(distancePx) ? distancePx : 0;
-    const translateX = length > 0 ? normalizeZero((dx / length) * distance) : 0;
-    const translateY = length > 0 ? normalizeZero((dy / length) * distance) : 0;
-
-    return { originX, originY, translateX, translateY };
+    return { originX, originY };
   } catch (error) {
     return null;
   }
