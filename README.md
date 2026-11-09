@@ -1,4 +1,7 @@
-<h1 align="center">dsh-webui-transition</h1>
+<div align="center">
+<img src="assets/icons/logo.png" alt="dsh-webui-transition logo" width="96" height="96" />
+<h1>dsh-webui-transition</h1>
+</div>
 
 <div align="center">
 
