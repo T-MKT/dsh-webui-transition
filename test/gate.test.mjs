@@ -168,6 +168,14 @@ describe("门卫 4：宿主 CSS transition 冲突", () => {
     assert.equal(gate.canAnimate(panel, "dialog"), true);
   });
 
+  test("dialog 上内联 transition: translate .2s 放行（插件不再动画 translate）", () => {
+    const { panel } = buildSettingsOverlay();
+    mount(panel);
+    setInlineTransition(panel, "translate", ".2s");
+
+    assert.equal(gate.canAnimate(panel, "dialog"), true);
+  });
+
   test("dialog 上内联 transition: opacity 0s 放行（时长不为正）", () => {
     const { panel } = buildSettingsOverlay();
     mount(panel);

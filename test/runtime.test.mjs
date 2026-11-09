@@ -18,6 +18,7 @@ import {
   animateCalls,
   buildGlassPanel,
   buildMenu,
+  buildSettingsOverlay,
   computedStyle,
   createFrameScheduler,
   createMatchMediaMock,
@@ -32,6 +33,7 @@ import {
   settleAnimations,
 } from "./helpers/env.mjs";
 import { createGate } from "../src/gate.js";
+import { ORIGIN_MARKER_ATTRIBUTE, ORIGIN_MARKER_CENTER } from "../src/marker.js";
 import { createPolicy } from "../src/policy.js";
 import { createTransitionRuntime } from "../src/runtime.js";
 import { createSurfaceTracker } from "../src/tracker.js";
@@ -41,16 +43,14 @@ import { createSurfaceTracker } from "../src/tracker.js";
 // ---------------------------------------------------------------------------
 
 const MENU_RECT = { left: 100, top: 100, width: 200, height: 100 };
-// 触发源在菜单正上方：origin=(100,0)，translate=(0,-4)（distancePx=4，首帧落在触发侧）。
+// 触发源在菜单正上方：origin=(100,0)。
 const MENU_SOURCE = { kind: "element", rect: { left: 150, top: 60, width: 100, height: 30 } };
 const MENU_ORIGIN = "100px 0px";
-const MENU_TRANSLATE = "0px -4px";
 
 const DIALOG_RECT = { left: 100, top: 100, width: 400, height: 300 };
-// 触发源在对话框正上方：origin=(200,0)，translate=(0,-12)（distancePx=12）。
+// 触发源在对话框正上方：origin=(200,0)。
 const DIALOG_SOURCE = { kind: "element", rect: { left: 250, top: 60, width: 100, height: 30 } };
 const DIALOG_ORIGIN = "200px 0px";
-const DIALOG_TRANSLATE = "0px -12px";
 
 function stubRect(element, rect) {
   element.getBoundingClientRect = () => ({
@@ -218,11 +218,9 @@ describe("runtime：观察与入场", () => {
     );
     assert.equal(surfaceCall.options.fill, "both", "动画期间用 fill:both 维持首尾帧");
 
-    // 原点感知：transform-origin 落在触发源最近边，位移方向由 origin 几何决定。
+    // 原点感知：transform-origin 落在触发源最近边。
     assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN, "transform-origin 来自触发源");
-    assert.equal(surfaceCall.keyframes[0].translate, MENU_TRANSLATE, "位移来自 origin 几何");
     assert.equal(Number(surfaceCall.keyframes[0].scale), 0.98, "表面从 .98 放大");
-    assert.equal(surfaceCall.keyframes[1].translate, "0 0", "末帧回到原位");
     for (const frame of surfaceCall.keyframes) {
       assert.equal(frame.opacity, undefined, "menu 表面不写 opacity（透明度下沉到子级）");
     }
@@ -429,8 +427,6 @@ describe("runtime：退场幽灵", () => {
     }
     // 退场复用入场缓存的 origin 几何（镜像）。
     assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN, "幽灵复用入场 origin");
-    assert.equal(surfaceCall.keyframes[0].translate, "0 0", "退场从原位开始");
-    assert.equal(surfaceCall.keyframes[1].translate, MENU_TRANSLATE, "退场朝触发源收回");
     assert.equal(surfaceCall.keyframes[0].boxShadow, naturalShadow, "阴影从计算值开始淡出");
 
     const ghostChildren = elementChildren(ghost);
@@ -499,7 +495,7 @@ describe("runtime：dispose", () => {
 // ---------------------------------------------------------------------------
 
 describe("runtime：原点感知与回退", () => {
-  test("origin 入场：使用解析出的触发源几何（transform-origin + 方向平移）", async () => {
+  test("origin 入场：使用解析出的触发源几何（transform-origin）", async () => {
     const harness = createHarness({ origin: createFakeOrigin({ source: MENU_SOURCE }) });
     const menu = buildMenu();
     stubRect(menu, MENU_RECT);
@@ -510,7 +506,6 @@ describe("runtime：原点感知与回退", () => {
     const surfaceCall = animateCalls.find((call) => call.element === menu);
     assert.ok(surfaceCall, "应播表面几何动画");
     assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN);
-    assert.equal(surfaceCall.keyframes[0].translate, MENU_TRANSLATE);
     assert.equal(harness.origin.state.resolveCalls > 0, true, "应调用 origin.resolve");
   });
 
@@ -561,7 +556,6 @@ describe("runtime：原点感知与回退", () => {
     const surfaceCall = animateCalls.find((call) => call.element === menu);
     assert.ok(surfaceCall, "pointer 回退应播表面几何动画");
     assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN);
-    assert.equal(surfaceCall.keyframes[0].translate, MENU_TRANSLATE);
     assert.equal(harness.origin.state.pointCalls > 0, true, "应读取最近指针点");
   });
 
@@ -588,7 +582,75 @@ describe("runtime：原点感知与回退", () => {
     const surfaceCall = animateCalls.find((call) => call.element === ghost);
     assert.ok(surfaceCall, "幽灵应播退场动画");
     assert.equal(surfaceCall.keyframes[0].transformOrigin, MENU_ORIGIN, "复用入场 origin");
-    assert.equal(surfaceCall.keyframes[1].translate, MENU_TRANSLATE, "复用入场方向平移");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v1.0.0 中心原点标记表面：设置面板无条件以正中心缩放（v1.0.0 §3.1.1）
+// ---------------------------------------------------------------------------
+
+const CENTER_ORIGIN = "200px 150px"; // DIALOG_RECT 400×300 的中心
+
+/** 标记设置面板装配：buildSettingsOverlay + 面板矩形 + 中心原点标记。 */
+function markSettingsPanel() {
+  const overlay = buildSettingsOverlay();
+  stubRect(overlay.panel, DIALOG_RECT);
+  overlay.panel.setAttribute(ORIGIN_MARKER_ATTRIBUTE, ORIGIN_MARKER_CENTER);
+  return overlay;
+}
+
+describe("runtime：中心原点标记表面", () => {
+  test("标记面板 + 无触发源：仍播表面几何动画，原点为面板中心且不解析触发源", async () => {
+    const harness = createHarness({
+      origin: createFakeOrigin({ source: null }),
+      fallbackMode: () => "fade",
+    });
+    const { overlay, panel } = markSettingsPanel();
+    document.body.appendChild(overlay);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const surfaceCall = animateCalls.find((call) => call.element === panel);
+    assert.ok(surfaceCall, "解析不到触发源时标记表面也应播表面几何动画");
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, CENTER_ORIGIN, "origin 为面板正中心");
+    assert.equal(harness.origin.state.resolveCalls, 0, "标记表面跳过触发源解析");
+    assert.equal(harness.origin.state.pointCalls, 0, "标记表面不做指针回退");
+  });
+
+  test("标记面板 + 有触发源：忽略触发源，仍取面板中心", async () => {
+    const harness = createHarness({ origin: createFakeOrigin({ source: DIALOG_SOURCE }) });
+    const { overlay, panel } = markSettingsPanel();
+    document.body.appendChild(overlay);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const surfaceCall = animateCalls.find((call) => call.element === panel);
+    assert.ok(surfaceCall, "标记面板应播表面几何动画");
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, CENTER_ORIGIN, "触发源不参与标记表面");
+    assert.equal(harness.origin.state.resolveCalls, 0, "有触发源时同样不解析");
+  });
+
+  test("标记面板退场幽灵复用中心 origin", async () => {
+    const harness = createHarness({ origin: createFakeOrigin({ source: DIALOG_SOURCE }) });
+    const stage = document.createElement("div");
+    document.body.appendChild(stage);
+    const { overlay, panel } = markSettingsPanel();
+    stage.appendChild(overlay);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+    await settleAnimations(); // 结清入场
+    resetAnimationLog();
+
+    // 入场后把触发源换到别处：退场必须复用入场缓存的中心几何。
+    harness.origin.state.source = { kind: "element", rect: { left: 0, top: 0, width: 10, height: 10 } };
+    panel.remove();
+    await nextTask();
+
+    const ghost = document.querySelector("[data-dsh-transition-ghost]");
+    assert.ok(ghost, "标记面板退场应产生幽灵");
+    const surfaceCall = animateCalls.find((call) => call.element === ghost);
+    assert.ok(surfaceCall, "幽灵应播退场动画");
+    assert.equal(surfaceCall.keyframes[0].transformOrigin, CENTER_ORIGIN, "幽灵复用中心 origin");
   });
 });
 
@@ -617,7 +679,6 @@ describe("runtime：伪元素玻璃", () => {
     const geometryCall = panelCalls.find((call) => !call.options.pseudoElement);
     assert.ok(geometryCall, "应有表面几何动画");
     assert.equal(geometryCall.keyframes[0].transformOrigin, DIALOG_ORIGIN);
-    assert.equal(geometryCall.keyframes[0].translate, DIALOG_TRANSLATE);
     assert.equal(Number(geometryCall.keyframes[0].scale), 0.98);
     assert.equal(geometryCall.keyframes[0].boxShadow, "none");
     for (const frame of geometryCall.keyframes) {

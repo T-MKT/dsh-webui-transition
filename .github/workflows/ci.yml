@@ -43,4 +43,4 @@ jobs:
         run: pnpm test
 
       - name: Verify committed build artifacts
-        run: git diff --exit-code -- client.js packages/dsh-webui-transition-settings/client.js
+        run: git diff --exit-code -- client.js packages/dsh-webui-transition-settings/client.js packages/dsh-webui-transition-settings/src/nav-icon.js

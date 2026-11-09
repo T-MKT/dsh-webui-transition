@@ -1,7 +1,7 @@
 /**
  * src/defs.js — 冻结常量与语义面描述符（`SURFACE_DEFS`）。
  *
- * 本文件是「数据」而不是「行为」：所有时长策略、拆分策略、阴影策略都从
+ * 本文件是「数据」而不是「行为」：所有时长策略、缩放策略、拆分策略、阴影策略都从
  * `SURFACE_DEFS` 读取，其它模块不得再出现 `kind === "menu" || kind === "listbox"`
  * 这类硬编码分支（.plan/v0.2.0/plan-b-rewrite.md §3.1）。
  */
@@ -34,9 +34,7 @@ export const TOKEN_FALLBACK = {
   slowMs: 300,
 };
 
-// 冻结的时长/几何策略表：kind → token / fallback / clamp / 入场几何 / 动画拆分方式。
-// distancePx：入场首帧沿「表面中心 → transform-origin」方向偏移的距离；正值 = 从触发侧
-// 起步（退场时收向触发侧）。零 = 不做方向位移。
+// 冻结的时长/缩放策略表：kind → token / fallback / clamp / 入场缩放与透明度起点 / 动画拆分方式。
 export const SURFACE_DEFS = {
   menu: {
     role: "menu",
@@ -44,7 +42,6 @@ export const SURFACE_DEFS = {
     fallbackMs: 150,
     minMs: 120,
     maxMs: 160,
-    distancePx: 4,
     scaleFrom: 0.98,
     opacityFrom: 0,
     easing: null, // null = 用 --ds-ease-in-out
@@ -57,7 +54,6 @@ export const SURFACE_DEFS = {
     fallbackMs: 150,
     minMs: 120,
     maxMs: 160,
-    distancePx: 4,
     scaleFrom: 0.98,
     opacityFrom: 0,
     easing: null,
@@ -70,7 +66,6 @@ export const SURFACE_DEFS = {
     fallbackMs: 220,
     minMs: 160,
     maxMs: 240,
-    distancePx: 12,
     scaleFrom: 0.98,
     opacityFrom: 0,
     easing: DIALOG_EASING,
@@ -83,7 +78,6 @@ export const SURFACE_DEFS = {
     fallbackMs: 180,
     minMs: 140,
     maxMs: 220,
-    distancePx: 0,
     scaleFrom: 1,
     opacityFrom: 0,
     easing: null,

@@ -3,18 +3,30 @@
  *
  * 通过 fake __ModuleLoader__ 捕获注册记录，用 baseline 模块桩材料化 factory，
  * 再用 fake ctx（slots / locale / emit / effect）执行 apply，断言：
- * 注册 id、inject、locale 文案注册、settings.section 注入与 slot options、清理可执行。
+ * 注册 id、inject、locale 文案注册、settings.section 与 settings.section.icon
+ * 注入及 slot options、4 个 effect（含设置面板打标 observer）与清理可执行，
+ * 以及打标行为：设置面板打 `data-dsh-transition-origin="center"`、非设置表面不打、
+ * 全部 cleanup 后不再打标。
  *
- * 依据：.agents/plan/v0.3.0/origin-aware-and-settings.md §2.7 / §3.6.1。
+ * 依据：.agents/plan/v0.3.0/origin-aware-and-settings.md §2.7 / §3.6.1；
+ * 打标见 .agents/plan/v1.0.0/settings-center-origin.md §2 / §3.2.1 Agent B。
  */
 
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 
 import {
+  ORIGIN_MARKER_ATTRIBUTE,
+  ORIGIN_MARKER_CENTER,
+} from "../packages/dsh-webui-transition-settings/src/contract.js";
+import {
+  buildGlassPanel,
+  buildSettingsOverlay,
   disposeEnvironment,
+  document,
   importBundle,
   materializeBundle,
+  nextTask,
   resetEnvironment,
 } from "./helpers/env.mjs";
 
@@ -68,6 +80,24 @@ function pluginTest(name, fn) {
   });
 }
 
+/**
+ * 模块级登记本文件创建的全部 effect：所有用例共用同一个 jsdom 文档，前序用例
+ * apply 后不会被自动清理，残留的打标 observer 会继续响应后续 DOM 插入，污染
+ * 「cleanup 后不打标」用例。因此 beforeEach 统一对已登记 effect 执行一次清理
+ * （异常吞掉，不影响环境复位）并清空登记。
+ */
+const registeredEffects = [];
+
+function disposeEffects(entries) {
+  for (const entry of entries) {
+    try {
+      if (typeof entry.cleanup === "function") entry.cleanup();
+    } catch (error) {
+      // 清理失败不阻断后续用例的环境复位
+    }
+  }
+}
+
 /** fake ctx：effect 立即执行并收集清理；locale / slots / emit 记录调用。 */
 function createFakeContext() {
   const state = {
@@ -82,7 +112,9 @@ function createFakeContext() {
   const ctx = {
     effect(callback, name) {
       const cleanup = callback();
-      state.effects.push({ name, cleanup });
+      const entry = { name, cleanup };
+      state.effects.push(entry);
+      registeredEffects.push(entry);
       return () => {};
     },
     emit(event, payload) {
@@ -119,6 +151,8 @@ function applyToFake() {
 }
 
 beforeEach(() => {
+  disposeEffects(registeredEffects);
+  registeredEffects.length = 0;
   resetEnvironment();
 });
 
@@ -165,27 +199,35 @@ pluginTest("apply 注册 locale 字典（NS + zh/en）", () => {
   assert.equal(dictionaries.en.fallbackPointer, "Pointer origin");
 });
 
-pluginTest("apply 向 settings.section 注入并注册设置页 slot", () => {
+pluginTest("apply 向 settings.section 与 settings.section.icon 注入并注册 slot", () => {
   const state = applyToFake();
-  assert.deepEqual(state.injections, ["settings.section"]);
+  assert.deepEqual(state.injections, ["settings.section", "settings.section.icon"]);
 
-  assert.equal(state.registrations.length, 1);
-  const [{ options, component }] = state.registrations;
-  assert.equal(options.name, "settings.section");
+  assert.equal(state.registrations.length, 2);
+  const section = state.registrations.find(({ options }) => options.name === "settings.section");
+  const icon = state.registrations.find(({ options }) => options.name === "settings.section.icon");
+  assert.ok(section && icon, "必须同时注册设置页与导航图标");
+
+  const { options, component } = section;
   assert.equal(options.id, "webui-transition");
   assert.equal(options.order, 25);
   assert.equal(options.locale, "webui-transition");
   assert.equal(typeof options.label, "function");
   assert.equal(options.label(), "nav", "label 通过 locale.bind 的 t（恒等桩）取 nav");
   assert.equal(typeof component, "function", "slot 组件应为 React 组件");
+
+  assert.equal(icon.options.id, options.id, "图标 id 必须等于分区 id，否则外壳不渲染");
+  assert.equal(typeof icon.component, "function", "图标组件应为 React 组件");
 });
 
-pluginTest("两个 effect 均带可执行的清理函数", () => {
+pluginTest("四个 effect 均带可执行的清理函数", () => {
   const state = applyToFake();
-  assert.equal(state.effects.length, 2);
+  assert.equal(state.effects.length, 4);
   assert.deepEqual(state.effects.map((entry) => entry.name).sort(), [
     "webui-transition-settings: dictionaries",
+    "webui-transition-settings: nav icon",
     "webui-transition-settings: page",
+    "webui-transition-settings: settings panel origin marker",
   ]);
   for (const entry of state.effects) {
     assert.equal(typeof entry.cleanup, "function", `${entry.name} 的清理函数必须可执行`);
@@ -193,4 +235,44 @@ pluginTest("两个 effect 均带可执行的清理函数", () => {
   assert.doesNotThrow(() => {
     for (const entry of state.effects) entry.cleanup();
   });
+});
+
+// ---------------------------------------------------------------------------
+// 设置面板打标：apply 后 observer 响应 body 的子节点插入
+// ---------------------------------------------------------------------------
+
+pluginTest("apply 后给插入的设置面板打中心原点标记", async () => {
+  applyToFake();
+
+  const { overlay, panel } = buildSettingsOverlay();
+  document.body.append(overlay);
+  // MutationObserver 回调是微任务，nextTask 的宏任务排在它之后。
+  await nextTask();
+
+  assert.equal(
+    panel.getAttribute(ORIGIN_MARKER_ATTRIBUTE),
+    ORIGIN_MARKER_CENTER,
+    "设置面板必须带中心缩放标记",
+  );
+});
+
+pluginTest("插入非设置表面不打中心原点标记", async () => {
+  applyToFake();
+
+  const panel = buildGlassPanel();
+  document.body.append(panel);
+  await nextTask();
+
+  assert.equal(panel.getAttribute(ORIGIN_MARKER_ATTRIBUTE), null, "非设置表面不应被打标");
+});
+
+pluginTest("全部 cleanup 后插入设置面板不再打标（observer 已断开）", async () => {
+  const state = applyToFake();
+  disposeEffects(state.effects);
+
+  const { overlay, panel } = buildSettingsOverlay();
+  document.body.append(overlay);
+  await nextTask();
+
+  assert.equal(panel.getAttribute(ORIGIN_MARKER_ATTRIBUTE), null, "observer 断开后不应再打标");
 });

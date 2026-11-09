@@ -128,13 +128,13 @@ export function readStyleProperty(style, property) {
   }
 }
 
-// 独立 transform 支持探测：CSS.supports('translate', ...) 且 CSS.supports('scale', ...)。
+// 独立 transform 支持探测：插件只用独立 `scale` 属性做几何动画，探测它即可。
 export function supportsIndependentTransforms() {
   const scope = globalScope();
   const css = scope && scope.CSS;
   if (!css || typeof css.supports !== "function") return false;
   try {
-    return css.supports("translate", "0 1px") && css.supports("scale", ".98");
+    return css.supports("scale", ".98");
   } catch (error) {
     return false;
   }

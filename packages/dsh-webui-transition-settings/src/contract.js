@@ -9,13 +9,23 @@
  * 读取失败（storage 不可用 / 访问抛错 / 坏 JSON / 字段非法）一律回退默认 fade，
  * 不向调用方抛错；normalize 始终返回新的 { fallback } 对象，冻结的 DEFAULT_SETTINGS
  * 只作为默认值来源，不直接暴露给调用方（与主包行为一致）。
- * 依据：.agents/plan/v0.3.0/origin-aware-and-settings.md §2.6 / §2.7。
+ *
+ * 另导出表面级中心原点标记常量（ORIGIN_MARKER_ATTRIBUTE / ORIGIN_MARKER_CENTER）：
+ * 表面所属插件给表面元素打标记，主插件据此无条件以表面正中心为 transform-origin 缩放。
+ *
+ * 依据：.agents/plan/v0.3.0/origin-aware-and-settings.md §2.6 / §2.7；
+ * 标记常量见 .agents/plan/v1.0.0/settings-center-origin.md §2。
  */
 
 export const SETTINGS_KEY = "dsh.webui-transition.settings.v1";
 export const SETTINGS_EVENT = "dsh-webui-transition/settings";
 export const FALLBACK_MODES = Object.freeze(["fade", "pointer"]);
 export const DEFAULT_SETTINGS = Object.freeze({ fallback: "fade" });
+
+// 表面级中心原点标记契约：与主包 src/marker.js 同值、独立实现（跨包不 import），
+// 由 test/contract.test.mjs 防漂移。
+export const ORIGIN_MARKER_ATTRIBUTE = "data-dsh-transition-origin";
+export const ORIGIN_MARKER_CENTER = "center";
 
 function defaults() {
   return { fallback: DEFAULT_SETTINGS.fallback };

@@ -4,12 +4,15 @@
  *
  * 主包 `src/settings.js` 与设置包 `src/contract.js` 是同一份冻结契约的两份独立实现：
  * 常量、normalize/read/write 行为、写入的 key 与 JSON 文本必须完全一致，防止跨包契约漂移。
+ * 表面级中心原点标记常量（主包 `src/marker.js` / 设置包 `src/contract.js`）同样两包
+ * 独立实现、取值必须一致（设置面板由设置插件打标，主插件识别）。
  */
 
 import assert from "node:assert/strict";
 import { after, describe, test } from "node:test";
 
 import * as settingsContract from "../packages/dsh-webui-transition-settings/src/contract.js";
+import * as mainMarker from "../src/marker.js";
 import * as mainSettings from "../src/settings.js";
 import {
   createFakeStorage,
@@ -55,6 +58,15 @@ describe("契约常量：两包必须完全一致", () => {
 
   test("DEFAULT_SETTINGS 深比较一致", () => {
     assert.deepEqual(settingsContract.DEFAULT_SETTINGS, mainSettings.DEFAULT_SETTINGS);
+  });
+
+  // 表面级中心原点标记：设置插件给设置面板打标，主插件识别；两包各自实现一份常量。
+  test("ORIGIN_MARKER_ATTRIBUTE 一致", () => {
+    assert.equal(settingsContract.ORIGIN_MARKER_ATTRIBUTE, mainMarker.ORIGIN_MARKER_ATTRIBUTE);
+  });
+
+  test("ORIGIN_MARKER_CENTER 一致", () => {
+    assert.equal(settingsContract.ORIGIN_MARKER_CENTER, mainMarker.ORIGIN_MARKER_CENTER);
   });
 });
 

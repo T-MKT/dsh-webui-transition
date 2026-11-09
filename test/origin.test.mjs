@@ -3,7 +3,7 @@
  *
  * 依据：.agents/plan/v0.3.0/origin-aware-and-settings.md §2.5（冻结行为）/
  * §2.7（冻结签名）/ §2.3（测试覆盖：解析优先级、邻接闸门、2.5s 新鲜度、
- * geometry 的 clamp/方向/零尺寸、指针点模式）。
+ * geometry 的 clamp/零尺寸、指针点模式）。
  *
  * jsdom 的 getBoundingClientRect 全 0，因此每个参与布局断言的元素都显式 stub；
  * 指针事件用 MouseEvent 派发到元素并冒泡到 window 的 capture 监听（与真实浏览器一致）。
@@ -81,13 +81,6 @@ function firePointer(target, type, { clientX = 0, clientY = 0 } = {}) {
 
 function fireKeydown(target) {
   target.dispatchEvent(new window.KeyboardEvent("keydown", { bubbles: true, cancelable: true }));
-}
-
-function assertClose(actual, expected, label) {
-  assert.ok(
-    Math.abs(actual - expected) <= 1e-9,
-    `${label}: 期望 ${expected}，实际 ${actual}`,
-  );
 }
 
 beforeEach(() => {
@@ -622,60 +615,55 @@ describe("lastPointerPoint：坐标与新鲜度", () => {
 // 7. geometryForSource
 // ---------------------------------------------------------------------------
 
-describe("geometryForSource：原点 clamp 与平移方向", () => {
+describe("geometryForSource：原点 clamp", () => {
   const surfaceRect = { left: 100, top: 100, width: 200, height: 100 };
   const center = { x: 200, y: 150 };
 
   test("surface 宽或高 ≤0 → null", () => {
-    assert.equal(geometryForSource({ kind: "point", x: 0, y: 0 }, { left: 0, top: 0, width: 0, height: 100 }, 12), null);
-    assert.equal(geometryForSource({ kind: "point", x: 0, y: 0 }, { left: 0, top: 0, width: 100, height: 0 }, 12), null);
-    assert.equal(geometryForSource({ kind: "point", x: 0, y: 0 }, { left: 0, top: 0, width: -10, height: 100 }, 12), null);
+    assert.equal(geometryForSource({ kind: "point", x: 0, y: 0 }, { left: 0, top: 0, width: 0, height: 100 }), null);
+    assert.equal(geometryForSource({ kind: "point", x: 0, y: 0 }, { left: 0, top: 0, width: 100, height: 0 }), null);
+    assert.equal(geometryForSource({ kind: "point", x: 0, y: 0 }, { left: 0, top: 0, width: -10, height: 100 }), null);
   });
 
   test("source 非法 → null", () => {
-    assert.equal(geometryForSource(null, surfaceRect, 12), null);
-    assert.equal(geometryForSource({ kind: "weird" }, surfaceRect, 12), null);
+    assert.equal(geometryForSource(null, surfaceRect), null);
+    assert.equal(geometryForSource({ kind: "weird" }, surfaceRect), null);
   });
 
-  test("指针点在表面左侧 → originX=0，平移朝向左侧", () => {
-    const geometry = geometryForSource({ kind: "point", x: 0, y: 150 }, surfaceRect, 20);
-    assert.deepEqual(geometry, { originX: 0, originY: 50, translateX: -20, translateY: 0 });
+  test("指针点在表面左侧 → originX=0", () => {
+    const geometry = geometryForSource({ kind: "point", x: 0, y: 150 }, surfaceRect);
+    assert.deepEqual(geometry, { originX: 0, originY: 50 });
   });
 
-  test("指针点在表面右侧 → originX=width，平移朝向右侧", () => {
-    const geometry = geometryForSource({ kind: "point", x: 1000, y: 150 }, surfaceRect, 20);
-    assert.deepEqual(geometry, { originX: 200, originY: 50, translateX: 20, translateY: 0 });
+  test("指针点在表面右侧 → originX=width", () => {
+    const geometry = geometryForSource({ kind: "point", x: 1000, y: 150 }, surfaceRect);
+    assert.deepEqual(geometry, { originX: 200, originY: 50 });
   });
 
-  test("指针点在表面上方 → originY=0，平移朝向上方", () => {
-    const geometry = geometryForSource({ kind: "point", x: 200, y: 0 }, surfaceRect, 20);
-    assert.deepEqual(geometry, { originX: 100, originY: 0, translateX: 0, translateY: -20 });
+  test("指针点在表面上方 → originY=0", () => {
+    const geometry = geometryForSource({ kind: "point", x: 200, y: 0 }, surfaceRect);
+    assert.deepEqual(geometry, { originX: 100, originY: 0 });
   });
 
-  test("指针点在表面下方 → originY=height，平移朝向下方", () => {
-    const geometry = geometryForSource({ kind: "point", x: 200, y: 1000 }, surfaceRect, 20);
-    assert.deepEqual(geometry, { originX: 100, originY: 100, translateX: 0, translateY: 20 });
+  test("指针点在表面下方 → originY=height", () => {
+    const geometry = geometryForSource({ kind: "point", x: 200, y: 1000 }, surfaceRect);
+    assert.deepEqual(geometry, { originX: 100, originY: 100 });
   });
 
-  test("指针点在对角 clamp 到右下角，平移按单位向量缩放", () => {
-    const geometry = geometryForSource({ kind: "point", x: 1000, y: 1000 }, surfaceRect, 20);
+  test("指针点在对角 clamp 到右下角", () => {
+    const geometry = geometryForSource({ kind: "point", x: 1000, y: 1000 }, surfaceRect);
     assert.equal(geometry.originX, 200);
     assert.equal(geometry.originY, 100);
-    assertClose(geometry.translateX, 17.88854381999832, "translateX");
-    assertClose(geometry.translateY, 8.94427190999916, "translateY");
   });
 
   test("element 源锚点 = 触发矩形上离表面中心最近的点（不是矩形中心）", () => {
     const geometry = geometryForSource(
       { kind: "element", rect: makeRect(100, 0, 20, 20) },
       surfaceRect,
-      12,
     );
     // 表面中心 (200,150) 投影到触发矩形 x∈[100,120]、y∈[0,20] → (120,20)
     assert.equal(geometry.originX, 20);
     assert.equal(geometry.originY, 0);
-    assertClose(geometry.translateX, -10.175979648061055, "translateX");
-    assertClose(geometry.translateY, -6.359987280038159, "translateY");
   });
 
   test("宽触发矩形（整行按钮）取面向表面的那条边：origin 落在水平居中处", () => {
@@ -683,28 +671,24 @@ describe("geometryForSource：原点 clamp 与平移方向", () => {
     const geometry = geometryForSource(
       { kind: "element", rect: makeRect(0, 220, 400, 40) },
       surfaceRect,
-      4,
     );
     // 表面中心 (200,150) 投影到触发矩形 → (200,220)，再夹到表面 → (100,100)
-    assert.deepEqual(geometry, { originX: 100, originY: 100, translateX: 0, translateY: 4 });
+    assert.deepEqual(geometry, { originX: 100, originY: 100 });
   });
 
   test("触发源偏在表面左上方时原点取最近的角", () => {
     const geometry = geometryForSource(
       { kind: "element", rect: makeRect(40, 20, 40, 20) },
       surfaceRect,
-      4,
     );
-    // 投影 → (100,100)，origin=(0,0)：左上角，位移指向左上。
-    assert.deepEqual(geometry, { originX: 0, originY: 0, translateX: -3.5777087639996634, translateY: -1.7888543819998317 });
+    // 投影 → (100,100)，origin=(0,0)：左上角。
+    assert.deepEqual(geometry, { originX: 0, originY: 0 });
   });
 
-  test("锚点与表面中心重合 → 零平移且归一 +0", () => {
-    assert.deepEqual(geometryForSource({ kind: "point", x: center.x, y: center.y }, surfaceRect, 20), {
+  test("锚点与表面中心重合 → origin 落在表面中心", () => {
+    assert.deepEqual(geometryForSource({ kind: "point", x: center.x, y: center.y }, surfaceRect), {
       originX: 100,
       originY: 50,
-      translateX: 0,
-      translateY: 0,
     });
   });
 });

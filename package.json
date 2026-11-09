@@ -1,7 +1,8 @@
 {
   "name": "@tak1208/dsh-webui-transition",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "DSH Web GUI 扩展：为设置面板与各级下拉菜单补上原点感知的开合过渡动画（Client-only bundle，源码 ESM + esbuild 构建，零第三方运行时依赖）。",
+  "icon": "./assets/icons/logo.png",
   "keywords": [
     "dsh",
     "deepseek-harness",
@@ -32,6 +33,7 @@
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
+    "assets/icons/logo.png",
     "LICENSE",
     "README.md",
     "README.en.md"

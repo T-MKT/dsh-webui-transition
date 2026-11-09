@@ -108,7 +108,6 @@ export function createPolicy(options = {}) {
     return {
       durationMs: readReducedMotion() ? 0 : duration,
       easing: def.easing === null ? snapshot.easing : def.easing,
-      distancePx: def.distancePx,
       scaleFrom: def.scaleFrom,
       opacityFrom: def.opacityFrom,
     };

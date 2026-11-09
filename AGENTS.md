@@ -3,9 +3,12 @@
 ## 环境要求
 项目全局使用 `pnpm` 进行操作。
 
-当前项目兼容 `dsh` 版本：`0.2.2-alpha.2`
+当前项目基线 `dsh` 版本：`0.2.2-rc.1`
+当前项目兼容 `dsh` 版本：`0.2.2-rc.1`
 
-常用命令：`pnpm build`（主插件 `src/browser.js` → `client.js`；设置插件 `packages/dsh-webui-transition-settings/src/browser.js` → 该包 `client.js`）、`pnpm test`（先构建，再跑 `node --test`）。
+常用命令：`pnpm build`（先由 `outline.svg` 生成设置页导航图标 `src/nav-icon.js`，再打两个产物：主插件 `src/browser.js` → `client.js`；设置插件 `packages/dsh-webui-transition-settings/src/browser.js` → 该包 `client.js`）、`pnpm test`（先构建，再跑 `node --test`）。
+
+发布：两个包必须按序用 pnpm 打包发布（`pnpm publish`，或 `pnpm pack` 后 `npm publish <tarball>`）：先 `@tak1208/dsh-webui-transition-settings`，后根包。`npm pack` / `npm publish` 不改写 `workspace:^`，直接发布会产出消费者装不上的包。
 
 ## 工作原则
 - **禁止修改 `dsh` 源代码。**
@@ -30,6 +33,7 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │   └── v0.3.0/
 │       └── origin-aware-and-settings.md      # v0.3.0 真源（原点感知 + 设置插件 + CI）
 ├── .github/workflows/ci.yml                  # CI：install / build / test / 产物一致性
+├── assets/icons/logo.png                     # 插件清单图标（package.json.icon）
 ├── src/                                      # ESM 源码（esbuild 入口：src/browser.js）
 │   ├── defs.js                               # 常量 + SURFACE_DEFS 表面描述符
 │   ├── utils.js                              # 通用小工具（CSS 解析 / 默认依赖 / 语义工具）
@@ -38,6 +42,7 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │   ├── gate.js                               # createGate：兼容性门卫（WAAPI / CSS animation / CSS transition）
 │   ├── settings.js                           # 主包侧设置契约：localStorage 读/清洗/写
 │   ├── origin.js                             # 交互捕获 / 触发源解析 / origin 几何
+│   ├── marker.js                             # 表面级中心原点标记契约 + 中心几何
 │   ├── frames.js                             # 纯帧函数：关键帧 + 动画规格拆分（含原点感知与伪元素玻璃）
 │   ├── runtime.js                            # createTransitionRuntime：观察 / 批量 / 入场 / 幽灵 / 清理
 │   └── browser.js                            # 浏览器入口：__ModuleLoader__.load 注册
@@ -47,13 +52,18 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │   ├── client.js                             # 构建产物（pnpm build 生成，不手改）
 │   ├── README.md / README.en.md              # 设置包说明（中英同步）
 │   ├── locale/en.json / locale/zh.json       # meta.title/description（插件清单显示）
+│   ├── assets/icons/logo.png                 # 插件清单图标（package.json.icon）
+│   ├── assets/icons/outline.svg              # 设置导航图标真源（构建期生成 src/nav-icon.js）
 │   └── src/
-│       ├── browser.js                        # factory 入口：inject/apply + settings.section 注册
+│       ├── browser.js                        # factory 入口：inject/apply + settings.section / settings.section.icon 注册
+│       ├── nav-icon.js                       # 设置导航图标组件（pnpm build 从 outline.svg 生成，不手改）
 │       ├── settings-page.js                  # React 页面（SegmentedControl）
-│       ├── contract.js                       # 与主包重复的 key/event/default/modes + read/write
+│       ├── panel-marker.js                   # 观察 body：给设置面板打中心原点标记
+│       ├── contract.js                       # 与主包重复的 key/event/default/modes/标记常量 + read/write
 │       └── locale.js                         # zh/en 运行时文案
 ├── scripts/
-│   └── build.mjs                             # esbuild：主插件 iife + 设置插件 cjs→factory 两个产物
+│   ├── build.mjs                             # 构建入口：先生成 nav-icon.js，再打两个 esbuild 产物
+│   └── generate-nav-icon.mjs                 # outline.svg → src/nav-icon.js（白名单校验，超出即失败）
 ├── test/
 │   ├── helpers/
 │   │   └── env.mjs                           # jsdom 装配 / fake loader / fake animate / fake storage
@@ -62,11 +72,12 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │   ├── gate.test.mjs
 │   ├── settings.test.mjs                     # 主包设置契约
 │   ├── origin.test.mjs                       # 触发源解析 / 闸门 / 新鲜度 / 几何
-│   ├── contract.test.mjs                     # 两包设置契约防漂移
+│   ├── contract.test.mjs                     # 两包设置契约与中心原点标记常量防漂移
 │   ├── frames.test.mjs
-│   ├── runtime.test.mjs
+│   ├── runtime.test.mjs                      # 观察 / 入场 / 幽灵 / 清理 / 中心原点标记表面
 │   ├── settings-page.test.mjs                # 设置页渲染 / 切换写 storage + emit
-│   ├── settings-plugin.test.mjs              # 设置插件产物 / inject / slot 注册
+│   ├── nav-icon.test.mjs                     # 设置导航图标渲染契约（生成组件）
+│   ├── settings-plugin.test.mjs              # 设置插件产物 / inject / slot 注册 / 设置面板打标
 │   └── bundle.test.mjs                       # 两个构建产物冒烟：classic 契约 + 冻结签名
 ├── locale/en.json / locale/zh.json           # 根包展示元信息（meta.title/description）
 ├── AGENTS.md

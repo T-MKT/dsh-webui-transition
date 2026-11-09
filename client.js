@@ -26,7 +26,6 @@
       fallbackMs: 150,
       minMs: 120,
       maxMs: 160,
-      distancePx: 4,
       scaleFrom: 0.98,
       opacityFrom: 0,
       easing: null,
@@ -41,7 +40,6 @@
       fallbackMs: 150,
       minMs: 120,
       maxMs: 160,
-      distancePx: 4,
       scaleFrom: 0.98,
       opacityFrom: 0,
       easing: null,
@@ -54,7 +52,6 @@
       fallbackMs: 220,
       minMs: 160,
       maxMs: 240,
-      distancePx: 12,
       scaleFrom: 0.98,
       opacityFrom: 0,
       easing: DIALOG_EASING,
@@ -67,7 +64,6 @@
       fallbackMs: 180,
       minMs: 140,
       maxMs: 220,
-      distancePx: 0,
       scaleFrom: 1,
       opacityFrom: 0,
       easing: null,
@@ -177,7 +173,7 @@
     const css = scope && scope.CSS;
     if (!css || typeof css.supports !== "function") return false;
     try {
-      return css.supports("translate", "0 1px") && css.supports("scale", ".98");
+      return css.supports("scale", ".98");
     } catch (error) {
       return false;
     }
@@ -212,7 +208,6 @@
   function geometryValuesFor(def, timing) {
     const source = timing && typeof timing === "object" ? timing : {};
     return {
-      distancePx: Number.isFinite(source.distancePx) ? source.distancePx : def.distancePx,
       scaleFrom: Number.isFinite(source.scaleFrom) ? source.scaleFrom : def.scaleFrom,
       opacityFrom: Number.isFinite(source.opacityFrom) ? source.opacityFrom : def.opacityFrom
     };
@@ -223,9 +218,6 @@
   function originValue(geometry) {
     return px(geometry.originX) + " " + px(geometry.originY);
   }
-  function translateValue(geometry) {
-    return px(geometry.translateX) + " " + px(geometry.translateY);
-  }
   function geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out, geometry) {
     if (!geometry || !independentTransforms) return [];
     const def = surfaceDefFor(kind);
@@ -233,8 +225,6 @@
     const origin = originValue(geometry);
     const first = { transformOrigin: origin };
     const last = { transformOrigin: origin };
-    first.translate = out ? "0 0" : translateValue(geometry);
-    last.translate = out ? translateValue(geometry) : "0 0";
     if (values.scaleFrom !== 1) {
       first.scale = out ? "1" : String(values.scaleFrom);
       last.scale = out ? String(values.scaleFrom) : "1";
@@ -318,8 +308,6 @@
         const origin = originValue(geometry);
         first.transformOrigin = origin;
         last.transformOrigin = origin;
-        first.translate = translateValue(geometry);
-        last.translate = "0 0";
         if (values.scaleFrom !== 1) {
           first.scale = String(values.scaleFrom);
           last.scale = "1";
@@ -345,8 +333,6 @@
         const origin = originValue(geometry);
         first.transformOrigin = origin;
         last.transformOrigin = origin;
-        first.translate = "0 0";
-        last.translate = translateValue(geometry);
         if (values.scaleFrom !== 1) {
           first.scale = "1";
           last.scale = String(values.scaleFrom);
@@ -366,7 +352,6 @@
     const computedStyle = options && typeof options.computedStyle === "function" ? options.computedStyle : defaultComputedStyle;
     const geometry = options && options.geometry ? options.geometry : null;
     const timing = {
-      distancePx: def.distancePx,
       scaleFrom: def.scaleFrom,
       opacityFrom: def.opacityFrom
     };
@@ -461,13 +446,11 @@
       const surface = SURFACE_DEFS[kind];
       const definition = surface && typeof surface === "object" ? surface : SURFACE_DEFS.menu;
       if (definition.splitFade) {
-        const properties2 = ["translate", "scale"];
-        if (definition.animateShadow) properties2.push("box-shadow");
-        return properties2;
+        const properties = ["scale"];
+        if (definition.animateShadow) properties.push("box-shadow");
+        return properties;
       }
-      const properties = ["opacity"];
-      if (definition.distancePx !== 0) properties.push("translate");
-      return properties;
+      return ["opacity"];
     }
     function readComputedProperty(style, camelName, kebabName) {
       let value = "";
@@ -875,7 +858,7 @@
   function normalizeZero(value) {
     return value === 0 ? 0 : value;
   }
-  function geometryForSource(source, surfaceRect, distancePx) {
+  function geometryForSource(source, surfaceRect) {
     try {
       if (!source || source.kind !== "element" && source.kind !== "point") return null;
       const box = toBox(surfaceRect);
@@ -902,13 +885,7 @@
       if (anchorX === null || anchorY === null) return null;
       const originX = normalizeZero(clampNumber(anchorX - box.left, 0, box.width));
       const originY = normalizeZero(clampNumber(anchorY - box.top, 0, box.height));
-      const dx = originX - box.width / 2;
-      const dy = originY - box.height / 2;
-      const length = Math.sqrt(dx * dx + dy * dy);
-      const distance = typeof distancePx === "number" && Number.isFinite(distancePx) ? distancePx : 0;
-      const translateX = length > 0 ? normalizeZero(dx / length * distance) : 0;
-      const translateY = length > 0 ? normalizeZero(dy / length * distance) : 0;
-      return { originX, originY, translateX, translateY };
+      return { originX, originY };
     } catch (error) {
       return null;
     }
@@ -994,7 +971,6 @@
       return {
         durationMs: readReducedMotion() ? 0 : duration,
         easing: def.easing === null ? snapshot.easing : def.easing,
-        distancePx: def.distancePx,
         scaleFrom: def.scaleFrom,
         opacityFrom: def.opacityFrom
       };
@@ -1030,6 +1006,26 @@
       timing,
       subscribe,
       dispose
+    };
+  }
+
+  // src/marker.js
+  var ORIGIN_MARKER_ATTRIBUTE = "data-dsh-transition-origin";
+  var ORIGIN_MARKER_CENTER = "center";
+  function isCenterOriginSurface(element) {
+    if (!element || element.nodeType !== 1) return false;
+    try {
+      return element.getAttribute(ORIGIN_MARKER_ATTRIBUTE) === ORIGIN_MARKER_CENTER;
+    } catch (error) {
+      return false;
+    }
+  }
+  function centerGeometryFor(rect) {
+    const originX = rect.width / 2;
+    const originY = rect.height / 2;
+    return {
+      originX: originX === 0 ? 0 : originX,
+      originY: originY === 0 ? 0 : originY
     };
   }
 
@@ -1384,31 +1380,30 @@
         return null;
       }
     }
-    function surfaceDefFor2(kind) {
-      return SURFACE_DEFS[kind] || SURFACE_DEFS.menu;
-    }
     function pointSource(point) {
       if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
       return { kind: "point", x: point.x, y: point.y };
     }
-    function entryGeometryFor(element, kind) {
+    function entryGeometryFor(element) {
       const rect = readSurfaceRect(element);
       if (!rect) return null;
-      const distancePx = surfaceDefFor2(kind).distancePx;
+      if (isCenterOriginSurface(element)) return centerGeometryFor(rect);
       const source = resolveSource(element);
-      let geometry = source ? geometryForSource(source, rect, distancePx) : null;
+      let geometry = source ? geometryForSource(source, rect) : null;
       if (!geometry && fallbackModeValue() === "pointer") {
         const point = pointSource(lastPointerPoint());
-        if (point) geometry = geometryForSource(point, rect, distancePx);
+        if (point) geometry = geometryForSource(point, rect);
       }
       return geometry;
     }
-    function exitGeometryFor(original, kind, rectElement) {
+    function exitGeometryFor(original, rectElement) {
       const cached = geometryCache.get(original);
       if (cached) return cached;
       const rect = readSurfaceRect(rectElement);
       if (!rect) return null;
-      const distancePx = surfaceDefFor2(kind).distancePx;
+      if (isCenterOriginSurface(original) || isCenterOriginSurface(rectElement)) {
+        return centerGeometryFor(rect);
+      }
       const documentNode = root && root.nodeType === 9 ? root : root && root.ownerDocument;
       let active = null;
       try {
@@ -1419,13 +1414,13 @@
       if (isElement(active) && active !== original && !(typeof original.contains === "function" && original.contains(active)) && isElementConnected(active)) {
         const activeRect = readSurfaceRect(active);
         if (activeRect) {
-          const geometry = geometryForSource({ kind: "element", rect: activeRect }, rect, distancePx);
+          const geometry = geometryForSource({ kind: "element", rect: activeRect }, rect);
           if (geometry) return geometry;
         }
       }
       if (fallbackModeValue() === "pointer") {
         const point = pointSource(lastPointerPoint());
-        if (point) return geometryForSource(point, rect, distancePx);
+        if (point) return geometryForSource(point, rect);
       }
       return null;
     }
@@ -1516,7 +1511,7 @@
       if (!canAnimate(element, intent.kind)) return;
       const timing = timingFor(intent.kind);
       if (!timing || !(timing.durationMs > 0)) return;
-      const geometry = entryGeometryFor(element, intent.kind);
+      const geometry = entryGeometryFor(element);
       if (geometry) geometryCache.set(element, geometry);
       const specs = specsFor(element, intent.kind, "in", geometry);
       let created = 0;
@@ -1567,7 +1562,7 @@
         if (!isElement(target)) continue;
         const timing = timingFor(surface.kind);
         if (!timing || !(timing.durationMs > 0)) continue;
-        const geometry = exitGeometryFor(surface.element, surface.kind, target);
+        const geometry = exitGeometryFor(surface.element, target);
         const specs = specsFor(target, surface.kind, "out", geometry);
         for (const spec of specs) {
           const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);

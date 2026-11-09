@@ -3,7 +3,7 @@
  *
  * 覆盖 .plan/v0.2.0/plan-b-rewrite.md §5.4 与
  * .agents/plan/v0.3.0/origin-aware-and-settings.md §3.3：
- * 原点感知几何帧（transform-origin / 方向平移 / 缩放）、geometry 为空时仅淡入、
+ * 原点感知几何帧（transform-origin / 缩放）、geometry 为空时仅淡入、
  * dialog 0.98、splitFade 拆分、伪元素玻璃、独立 transform 降级、fadeKeyframesFor 双向。
  */
 
@@ -27,14 +27,14 @@ import {
   resetEnvironment,
 } from "./helpers/env.mjs";
 
-const MENU_TIMING = { distancePx: 4, scaleFrom: 0.98, opacityFrom: 0 };
-const DIALOG_TIMING = { distancePx: 12, scaleFrom: 0.98, opacityFrom: 0 };
-const MASK_TIMING = { distancePx: 0, scaleFrom: 1, opacityFrom: 0 };
+const MENU_TIMING = { scaleFrom: 0.98, opacityFrom: 0 };
+const DIALOG_TIMING = { scaleFrom: 0.98, opacityFrom: 0 };
+const MASK_TIMING = { scaleFrom: 1, opacityFrom: 0 };
 
-// 原点感知几何：origin 为表面局部坐标，translate 为方向位移（由 origin.js 计算）。
-const MENU_GEOMETRY = { originX: 10, originY: 0, translateX: 0, translateY: 4 };
-const DIALOG_GEOMETRY = { originX: 20, originY: 0, translateX: 0, translateY: -12 };
-const MASK_GEOMETRY = { originX: 0, originY: 0, translateX: 0, translateY: 0 };
+// 原点感知几何：origin 为表面局部坐标（由 origin.js 计算）。
+const MENU_GEOMETRY = { originX: 10, originY: 0 };
+const DIALOG_GEOMETRY = { originX: 20, originY: 0 };
+const MASK_GEOMETRY = { originX: 0, originY: 0 };
 
 beforeEach(resetEnvironment);
 after(disposeEnvironment);
@@ -43,11 +43,11 @@ after(disposeEnvironment);
 // 原点感知几何帧
 // ---------------------------------------------------------------------------
 
-test("menu：geometry 非空时写 transform-origin + 方向平移 + 缩放，不含 opacity", () => {
+test("menu：geometry 非空时写 transform-origin + 缩放，不含 opacity", () => {
   const frames = keyframesFor("menu", MENU_TIMING, true, null, MENU_GEOMETRY);
   assert.deepEqual(frames, [
-    { transformOrigin: "10px 0px", translate: "0px 4px", scale: "0.98" },
-    { transformOrigin: "10px 0px", translate: "0 0", scale: "1" },
+    { transformOrigin: "10px 0px", scale: "0.98" },
+    { transformOrigin: "10px 0px", scale: "1" },
   ]);
   assert.equal("opacity" in frames[0], false);
   assert.equal("opacity" in frames[1], false);
@@ -63,7 +63,6 @@ test("menu：boxShadow 只在 geometry 非空时进入表面帧", () => {
   const frames = keyframesFor("menu", MENU_TIMING, true, shadow, MENU_GEOMETRY);
   assert.equal(frames[0].boxShadow, "none");
   assert.equal(frames[1].boxShadow, shadow);
-  assert.equal(frames[0].translate, "0px 4px");
 
   // geometry 为空时阴影不参与动画。
   assert.deepEqual(keyframesFor("menu", MENU_TIMING, true, shadow), []);
@@ -72,8 +71,8 @@ test("menu：boxShadow 只在 geometry 非空时进入表面帧", () => {
 test("menu：退场关键帧是入场镜像（末帧阴影回到 none）", () => {
   const shadow = "rgb(0, 0, 0) 0px 4px 8px";
   assert.deepEqual(exitKeyframesFor("menu", MENU_TIMING, true, shadow, MENU_GEOMETRY), [
-    { transformOrigin: "10px 0px", translate: "0 0", scale: "1", boxShadow: shadow },
-    { transformOrigin: "10px 0px", translate: "0px 4px", scale: "0.98", boxShadow: "none" },
+    { transformOrigin: "10px 0px", scale: "1", boxShadow: shadow },
+    { transformOrigin: "10px 0px", scale: "0.98", boxShadow: "none" },
   ]);
 });
 
@@ -83,28 +82,28 @@ test("timing 缺失或非有限数时回退 SURFACE_DEFS 的几何值", () => {
     keyframesFor("menu", MENU_TIMING, true, null, MENU_GEOMETRY),
   );
   assert.deepEqual(
-    keyframesFor("menu", { distancePx: NaN }, true, null, MENU_GEOMETRY),
+    keyframesFor("menu", { scaleFrom: NaN }, true, null, MENU_GEOMETRY),
     keyframesFor("menu", MENU_TIMING, true, null, MENU_GEOMETRY),
   );
   // dialog 的 scaleFrom 来自 SURFACE_DEFS（0.98）。
   assert.deepEqual(keyframesFor("dialog", null, true, null, DIALOG_GEOMETRY), [
-    { opacity: 0, transformOrigin: "20px 0px", translate: "0px -12px", scale: "0.98" },
-    { opacity: 1, transformOrigin: "20px 0px", translate: "0 0", scale: "1" },
+    { opacity: 0, transformOrigin: "20px 0px", scale: "0.98" },
+    { opacity: 1, transformOrigin: "20px 0px", scale: "1" },
   ]);
 });
 
 test("dialog：整体 opacity 帧 + 原点几何 + 0.98 缩放，退场镜像", () => {
   assert.deepEqual(keyframesFor("dialog", DIALOG_TIMING, true, null, DIALOG_GEOMETRY), [
-    { opacity: 0, transformOrigin: "20px 0px", translate: "0px -12px", scale: "0.98" },
-    { opacity: 1, transformOrigin: "20px 0px", translate: "0 0", scale: "1" },
+    { opacity: 0, transformOrigin: "20px 0px", scale: "0.98" },
+    { opacity: 1, transformOrigin: "20px 0px", scale: "1" },
   ]);
   assert.deepEqual(exitKeyframesFor("dialog", DIALOG_TIMING, true, null, DIALOG_GEOMETRY), [
-    { opacity: 1, transformOrigin: "20px 0px", translate: "0 0", scale: "1" },
-    { opacity: 0, transformOrigin: "20px 0px", translate: "0px -12px", scale: "0.98" },
+    { opacity: 1, transformOrigin: "20px 0px", scale: "1" },
+    { opacity: 0, transformOrigin: "20px 0px", scale: "0.98" },
   ]);
 });
 
-test("dialog：geometry 为空时只出 opacity 帧（无 translate）", () => {
+test("dialog：geometry 为空时只出 opacity 帧（无几何）", () => {
   assert.deepEqual(keyframesFor("dialog", DIALOG_TIMING, true), [
     { opacity: 0 },
     { opacity: 1 },
@@ -115,11 +114,11 @@ test("dialog：geometry 为空时只出 opacity 帧（无 translate）", () => {
   ]);
 });
 
-test("mask：geometry 为空时只有 opacity；非空时加 origin 与零位移（scaleFrom 1 无 scale）", () => {
+test("mask：geometry 为空时只有 opacity；非空时只剩 transformOrigin（scaleFrom 1 无 scale）", () => {
   assert.deepEqual(keyframesFor("mask", MASK_TIMING, true), [{ opacity: 0 }, { opacity: 1 }]);
   assert.deepEqual(keyframesFor("mask", MASK_TIMING, true, null, MASK_GEOMETRY), [
-    { opacity: 0, transformOrigin: "0px 0px", translate: "0px 0px" },
-    { opacity: 1, transformOrigin: "0px 0px", translate: "0 0" },
+    { opacity: 0, transformOrigin: "0px 0px" },
+    { opacity: 1, transformOrigin: "0px 0px" },
   ]);
 });
 
@@ -144,8 +143,8 @@ test("animationSpecsFor(menu)：geometry 非空时表面几何 + 每个直接元
   assert.equal(specs.length, 3);
   assert.equal(specs[0].element, menu);
   assert.deepEqual(specs[0].keyframes, [
-    { transformOrigin: "10px 0px", translate: "0px 4px", scale: "0.98" },
-    { transformOrigin: "10px 0px", translate: "0 0", scale: "1" },
+    { transformOrigin: "10px 0px", scale: "0.98" },
+    { transformOrigin: "10px 0px", scale: "1" },
   ]);
 
   const [material, content] = Array.from(menu.children);
@@ -192,8 +191,8 @@ test("animationSpecsFor：无直接元素子级时回退为表面整体（opacit
   assert.equal(specs.length, 1);
   assert.equal(specs[0].element, menu);
   assert.deepEqual(specs[0].keyframes, [
-    { transformOrigin: "10px 0px", translate: "0px 4px", scale: "0.98", opacity: 0 },
-    { transformOrigin: "10px 0px", translate: "0 0", scale: "1", opacity: 1 },
+    { transformOrigin: "10px 0px", scale: "0.98", opacity: 0 },
+    { transformOrigin: "10px 0px", scale: "1", opacity: 1 },
   ]);
 
   // 无几何帧时单独 opacity 帧。
@@ -209,7 +208,7 @@ test("animationSpecsFor：阴影缺失退化仍保留几何；有阴影时阴影
   const missingSpecs = animationSpecsFor(menu, "menu", "in", true, { geometry: MENU_GEOMETRY });
   const missingFrames = missingSpecs[0].keyframes;
   assert.equal("boxShadow" in missingFrames[0], false);
-  assert.equal(missingFrames[0].translate, "0px 4px");
+  assert.equal(missingFrames[0].transformOrigin, "10px 0px");
 
   const shadow = "rgb(0, 0, 0) 0px 4px 8px";
   menu.style.boxShadow = shadow;
@@ -228,8 +227,8 @@ test("animationSpecsFor(dialog/mask)：整体一条规格（geometry 非空 / �
     {
       element: panel,
       keyframes: [
-        { opacity: 0, transformOrigin: "20px 0px", translate: "0px -12px", scale: "0.98" },
-        { opacity: 1, transformOrigin: "20px 0px", translate: "0 0", scale: "1" },
+        { opacity: 0, transformOrigin: "20px 0px", scale: "0.98" },
+        { opacity: 1, transformOrigin: "20px 0px", scale: "1" },
       ],
     },
   ]);
@@ -286,11 +285,10 @@ test("伪元素玻璃 dialog 入场：表面只做几何/阴影，子级与伪�
   assert.deepEqual(specs[0].keyframes, [
     {
       transformOrigin: "20px 0px",
-      translate: "0px -12px",
       scale: "0.98",
       boxShadow: "none",
     },
-    { transformOrigin: "20px 0px", translate: "0 0", scale: "1", boxShadow: GLASS_SHADOW },
+    { transformOrigin: "20px 0px", scale: "1", boxShadow: GLASS_SHADOW },
   ]);
   for (const frame of specs[0].keyframes) {
     assert.equal("opacity" in frame, false, "伪元素玻璃表面不得有 opacity 帧（否则成为 backdrop-root）");
@@ -314,10 +312,9 @@ test("伪元素玻璃 dialog 退场：几何/阴影镜像，子级与伪元素�
   });
 
   assert.deepEqual(specs[0].keyframes, [
-    { transformOrigin: "20px 0px", translate: "0 0", scale: "1", boxShadow: GLASS_SHADOW },
+    { transformOrigin: "20px 0px", scale: "1", boxShadow: GLASS_SHADOW },
     {
       transformOrigin: "20px 0px",
-      translate: "0px -12px",
       scale: "0.98",
       boxShadow: "none",
     },
@@ -383,8 +380,8 @@ test("伪元素玻璃：表面自身带 backdrop-filter 时维持整体 opacity 
     {
       element: panel,
       keyframes: [
-        { opacity: 0, transformOrigin: "20px 0px", translate: "0px -12px", scale: "0.98" },
-        { opacity: 1, transformOrigin: "20px 0px", translate: "0 0", scale: "1" },
+        { opacity: 0, transformOrigin: "20px 0px", scale: "0.98" },
+        { opacity: 1, transformOrigin: "20px 0px", scale: "1" },
       ],
     },
   ]);
@@ -403,8 +400,8 @@ test("伪元素玻璃：无直接元素子级时仍有几何 + 伪元素两条�
   assert.deepEqual(specs[0], {
     element: panel,
     keyframes: [
-      { transformOrigin: "20px 0px", translate: "0px -12px", scale: "0.98" },
-      { transformOrigin: "20px 0px", translate: "0 0", scale: "1" },
+      { transformOrigin: "20px 0px", scale: "0.98" },
+      { transformOrigin: "20px 0px", scale: "1" },
     ],
   });
   assert.equal(specs[1].pseudoElement, "::before");
