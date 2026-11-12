@@ -99,7 +99,11 @@ function createHarness(overrides = {}) {
   const scheduler = createFrameScheduler();
   const media = createMatchMediaMock(false);
   const style = typeof overrides.computedStyle === "function" ? overrides.computedStyle : computedStyle;
-  const policy = createPolicy({ matchMedia: media.matchMedia, computedStyle: style });
+  const policy = createPolicy({
+    matchMedia: media.matchMedia,
+    computedStyle: style,
+    settings: overrides.settings,
+  });
   const tracker = createSurfaceTracker();
   const gate = createGate({ computedStyle: style });
   const origin = overrides.origin === undefined ? createFakeOrigin() : overrides.origin;
@@ -792,5 +796,85 @@ describe("runtime：伪元素玻璃", () => {
       0,
       "全部动画 settle 后幽灵应被移除",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v1.1.0 可调配动画参数：policy.timing 透传到关键帧与动画器
+// ---------------------------------------------------------------------------
+
+describe("runtime：可调配动画参数透传", () => {
+  test("入场：设置的时长 / 缩放 / 透明度起点驱动表面与子级动画", async () => {
+    const harness = createHarness({
+      origin: createFakeOrigin({ source: MENU_SOURCE }),
+      settings: { durationMs: 300, scaleFrom: 0.9, opacityFrom: 0.3 },
+    });
+    const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
+    document.body.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    const surfaceCall = animateCalls.find((call) => call.element === menu);
+    assert.ok(surfaceCall, "应播表面几何动画");
+    assert.equal(surfaceCall.options.duration, 300, "时长来自设置而非 token");
+    assert.equal(Number(surfaceCall.keyframes[0].scale), 0.9, "缩放起点来自设置");
+
+    const children = elementChildren(menu);
+    const childCalls = animateCalls.filter((call) => children.includes(call.element));
+    assert.equal(childCalls.length, children.length);
+    for (const call of childCalls) {
+      assert.equal(call.options.duration, 300, "子级与表面共用设置时长");
+      assert.deepEqual(call.keyframes, [{ opacity: 0.3 }, { opacity: 1 }], "透明度起点来自设置");
+    }
+  });
+
+  test("退场幽灵复用同一 timing：镜像缩放与透明度起点", async () => {
+    const harness = createHarness({
+      origin: createFakeOrigin({ source: MENU_SOURCE }),
+      settings: { durationMs: 300, scaleFrom: 0.9, opacityFrom: 0.3 },
+    });
+    const stage = document.createElement("div");
+    document.body.appendChild(stage);
+    const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
+    stage.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+    await settleAnimations();
+    resetAnimationLog();
+
+    menu.remove();
+    await nextTask();
+
+    const ghost = document.querySelector("[data-dsh-transition-ghost]");
+    assert.ok(ghost, "退场应插入幽灵副本");
+    const surfaceCall = animateCalls.find((call) => call.element === ghost);
+    assert.ok(surfaceCall, "幽灵应播表面退场动画");
+    assert.equal(surfaceCall.options.duration, 300, "退场时长同样来自设置");
+    assert.deepEqual(surfaceCall.keyframes, [
+      { transformOrigin: MENU_ORIGIN, scale: "1" },
+      { transformOrigin: MENU_ORIGIN, scale: "0.9" },
+    ]);
+
+    const ghostChildren = elementChildren(ghost);
+    const childCalls = animateCalls.filter((call) => ghostChildren.includes(call.element));
+    for (const call of childCalls) {
+      assert.deepEqual(call.keyframes, [{ opacity: 1 }, { opacity: 0.3 }]);
+    }
+  });
+
+  test("分表面时长为 0 时该表面不播动画（复用 timing 的门槛，无额外开关）", async () => {
+    const harness = createHarness({
+      origin: createFakeOrigin({ source: MENU_SOURCE }),
+      settings: { surfaces: { menu: { durationMs: 0 } } },
+    });
+    const menu = buildMenu();
+    stubRect(menu, MENU_RECT);
+    document.body.appendChild(menu);
+    await nextTask();
+    flushAllFrames(harness.scheduler);
+
+    assert.equal(animateCalls.length, 0, "时长为 0 时不创建任何动画");
   });
 });

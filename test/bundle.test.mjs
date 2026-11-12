@@ -53,7 +53,7 @@ function settingsRequire(specifier) {
   }
   if (specifier === "react-dom") return { default: {} };
   if (specifier === "@deepseek-ai/dsh-client-ui-primitives") {
-    return { SegmentedControl: () => null };
+    return { SegmentedControl: () => null, SegmentedTabs: () => null, SettingsValueField: () => null };
   }
   throw new Error("unexpected require：" + specifier);
 }

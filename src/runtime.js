@@ -197,11 +197,12 @@ export function createTransitionRuntime(options = {}) {
   // 入场时缓存的几何（元素 → { originX, originY }），退场幽灵复用。
   let geometryCache = new WeakMap();
 
-  // 规格只依赖「表面 + kind + 方向 + 几何」，入场与退场幽灵共用同一套拆分规则。
-  function specsFor(element, kind, direction, geometry) {
+  // 规格只依赖「表面 + kind + 方向 + 几何 + timing」，入场与退场幽灵共用同一套拆分规则。
+  function specsFor(element, kind, direction, geometry, timing) {
     return animationSpecsFor(element, kind, direction, supportsIndependentTransforms(), {
       ...specOptions,
       geometry: geometry || null,
+      timing: timing || null,
     });
   }
 
@@ -432,7 +433,7 @@ export function createTransitionRuntime(options = {}) {
     const geometry = entryGeometryFor(element);
     if (geometry) geometryCache.set(element, geometry);
 
-    const specs = specsFor(element, intent.kind, "in", geometry);
+    const specs = specsFor(element, intent.kind, "in", geometry, timing);
     let created = 0;
     for (const spec of specs) {
       const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);
@@ -499,7 +500,7 @@ export function createTransitionRuntime(options = {}) {
       // 退场几何：优先入场缓存；否则用 activeElement / 指针回退。矩形从克隆体读取
       // （原表面此时已脱离文档，getBoundingClientRect 为 0）。
       const geometry = exitGeometryFor(surface.element, target);
-      const specs = specsFor(target, surface.kind, "out", geometry);
+      const specs = specsFor(target, surface.kind, "out", geometry, timing);
       for (const spec of specs) {
         const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);
         if (!animation) continue;

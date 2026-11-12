@@ -1,5 +1,6 @@
 /**
- * test/policy.test.mjs — src/policy.js 单测（.plan/v0.2.0/plan-b-rewrite.md §5.1）。
+ * test/policy.test.mjs — src/policy.js 单测（.plan/v0.2.0/plan-b-rewrite.md §5.1；
+ * 动画参数见 .agents/plan/v1.1.0/animation-params.md §3.2.1）。
  */
 
 import assert from "node:assert/strict";
@@ -19,7 +20,11 @@ const activePolicies = [];
 
 function createPolicyHarness(options = {}) {
   const media = createMatchMediaMock(Boolean(options.reducedMotion));
-  const policy = createPolicy({ matchMedia: media.matchMedia, computedStyle });
+  const policy = createPolicy({
+    matchMedia: media.matchMedia,
+    computedStyle,
+    settings: options.settings,
+  });
   activePolicies.push(policy);
   return { media, policy };
 }
@@ -176,5 +181,135 @@ describe("reduced-motion：归零与实时订阅", () => {
     media.setMatches(true);
     assert.deepEqual(observed, []);
     assert.equal(policy.reducedMotion(), false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v1.1.0 可调配动画参数：设置 → 最终 timing 的唯一收口
+// ---------------------------------------------------------------------------
+
+const KINDS = ["menu", "listbox", "dialog", "mask"];
+
+describe("timing：设置优先级与实时读取", () => {
+  test("无设置 / 空设置时行为与 v1.0.0 完全一致", () => {
+    const baseline = createPolicyHarness();
+    const empty = createPolicyHarness({ settings: {} });
+    for (const kind of KINDS) {
+      assert.deepEqual(empty.policy.timing(kind), baseline.policy.timing(kind), kind);
+    }
+  });
+
+  test("全局时长覆盖全部四类表面，且绕过 kind 的 min/max clamp", () => {
+    const { policy } = createPolicyHarness({ settings: { durationMs: 300 } });
+    for (const kind of KINDS) {
+      assert.equal(policy.timing(kind).durationMs, 300, kind);
+    }
+  });
+
+  test("分表面覆盖优先于全局；listbox 跟随 menu 组", () => {
+    const { policy } = createPolicyHarness({
+      settings: { durationMs: 300, surfaces: { menu: { durationMs: 90 }, mask: { durationMs: 40 } } },
+    });
+    assert.equal(policy.timing("menu").durationMs, 90);
+    assert.equal(policy.timing("listbox").durationMs, 90);
+    assert.equal(policy.timing("dialog").durationMs, 300);
+    assert.equal(policy.timing("mask").durationMs, 40);
+  });
+
+  test("只有分表面值、无全局值时，其余表面仍读 token", () => {
+    clearTokens();
+    const { policy } = createPolicyHarness({
+      settings: { surfaces: { menu: { durationMs: 90 } } },
+    });
+    assert.equal(policy.timing("menu").durationMs, 90);
+    assert.equal(policy.timing("dialog").durationMs, 220);
+    assert.equal(policy.timing("mask").durationMs, 180);
+  });
+
+  test("全局缩放不作用于遮罩；遮罩显式分表面缩放才生效", () => {
+    const global = createPolicyHarness({ settings: { scaleFrom: 0.9 } });
+    assert.equal(global.policy.timing("menu").scaleFrom, 0.9);
+    assert.equal(global.policy.timing("listbox").scaleFrom, 0.9);
+    assert.equal(global.policy.timing("dialog").scaleFrom, 0.9);
+    assert.equal(global.policy.timing("mask").scaleFrom, 1, "全局缩放不得让遮罩露出页面边缘");
+
+    const overridden = createPolicyHarness({
+      settings: { scaleFrom: 0.9, surfaces: { mask: { scaleFrom: 0.96 } } },
+    });
+    assert.equal(overridden.policy.timing("mask").scaleFrom, 0.96);
+  });
+
+  test("透明度两层：分表面优先，其余跟随全局", () => {
+    const { policy } = createPolicyHarness({
+      settings: { opacityFrom: 0.2, surfaces: { dialog: { opacityFrom: 0.5 } } },
+    });
+    assert.equal(policy.timing("menu").opacityFrom, 0.2);
+    assert.equal(policy.timing("listbox").opacityFrom, 0.2);
+    assert.equal(policy.timing("dialog").opacityFrom, 0.5);
+    assert.equal(policy.timing("mask").opacityFrom, 0.2);
+  });
+
+  test("时长为 0 表示关闭该表面组的过渡动画（不再退回 token）", () => {
+    const { policy } = createPolicyHarness({
+      settings: { durationMs: 0, surfaces: { dialog: { durationMs: 0 } } },
+    });
+    for (const kind of KINDS) {
+      assert.equal(policy.timing(kind).durationMs, 0, kind);
+    }
+  });
+
+  test("reduced-motion 高于设置：时长归零，几何参数仍取设置", () => {
+    const { policy } = createPolicyHarness({
+      reducedMotion: true,
+      settings: { durationMs: 300, scaleFrom: 0.9, opacityFrom: 0.4 },
+    });
+    for (const kind of KINDS) {
+      const timing = policy.timing(kind);
+      assert.equal(timing.durationMs, 0, kind);
+      assert.equal(timing.scaleFrom, kind === "mask" ? 1 : 0.9, kind);
+      assert.equal(timing.opacityFrom, 0.4, kind);
+    }
+  });
+
+  test("settings 为函数时实时读取最新快照（无需重建 policy）", () => {
+    let settings = { durationMs: 300, scaleFrom: 0.9 };
+    const { policy } = createPolicyHarness({ settings: () => settings });
+    assert.equal(policy.timing("menu").durationMs, 300);
+    assert.equal(policy.timing("menu").scaleFrom, 0.9);
+
+    settings = { durationMs: 120, surfaces: { menu: { scaleFrom: 0.96 } } };
+    assert.equal(policy.timing("menu").durationMs, 120);
+    assert.equal(policy.timing("menu").scaleFrom, 0.96);
+    assert.equal(policy.timing("dialog").scaleFrom, 0.98, "撤回全局缩放后回到内置默认");
+  });
+
+  test("settings getter 抛错 → 按无设置处理，不向调用方抛出", () => {
+    clearTokens();
+    const { policy } = createPolicyHarness({
+      settings: () => {
+        throw new Error("boom");
+      },
+    });
+    assert.equal(policy.timing("menu").durationMs, 150);
+    assert.equal(policy.timing("menu").scaleFrom, 0.98);
+    assert.equal(policy.timing("mask").scaleFrom, 1);
+  });
+
+  test("设置里的非法值被清洗：非有限数回退，越界值 clamp", () => {
+    clearTokens();
+    const { policy } = createPolicyHarness({
+      settings: {
+        durationMs: "300",
+        scaleFrom: NaN,
+        opacityFrom: Infinity,
+        surfaces: { menu: { durationMs: 5000, scaleFrom: 2, opacityFrom: -1 } },
+      },
+    });
+    assert.equal(policy.timing("dialog").durationMs, 220, "字符串时长按自动处理");
+    assert.equal(policy.timing("menu").durationMs, 1000, "越界时长被 clamp");
+    assert.equal(policy.timing("menu").scaleFrom, 1, "越界缩放被 clamp");
+    assert.equal(policy.timing("menu").opacityFrom, 0, "越界透明度被 clamp");
+    assert.equal(policy.timing("dialog").scaleFrom, 0.98);
+    assert.equal(policy.timing("dialog").opacityFrom, 0);
   });
 });

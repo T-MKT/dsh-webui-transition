@@ -140,11 +140,14 @@ function naturalBoxShadow(element, computedStyle = defaultComputedStyle) {
   return trimmed;
 }
 
-// 淡入 / 淡出关键帧：'out' 从自然值到 0，其余从 0 到自然值（与 v0.1.0 一致）。
-export function fadeKeyframesFor(direction, opacity) {
+// 淡入 / 淡出关键帧：'out' 从自然值到起点，其余从起点到自然值。
+// 起点是自然值的比例（opacityFrom ∈ [0,1]，缺省 0 = 从完全透明开始，与 v1.0.0 一致）。
+export function fadeKeyframesFor(direction, opacity, opacityFrom = 0) {
   const value = Number.isFinite(opacity) ? opacity : 1;
-  if (direction === "out") return [{ opacity: value }, { opacity: 0 }];
-  return [{ opacity: 0 }, { opacity: value }];
+  const ratio = Number.isFinite(opacityFrom) ? Math.min(1, Math.max(0, opacityFrom)) : 0;
+  const start = value * ratio;
+  if (direction === "out") return [{ opacity: value }, { opacity: start }];
+  return [{ opacity: start }, { opacity: value }];
 }
 
 // 入场关键帧（§3.6 + v0.3.0 原点感知）：
@@ -208,13 +211,14 @@ export function exitKeyframesFor(kind, timing, independentTransforms, boxShadow 
 
 // 把一个表面拆成若干条 WAAPI 动画规格（§3.6 + v0.2.0 伪元素玻璃 + v0.3.0 原点感知）：
 // - splitFade 表面：表面几何/阴影一条（geometry 非空时）+ 每个直接元素子级一条
-//   opacity（0 ↔ 自然值）；无直接元素子级时回退为「表面整体」（opacity 0↔1
-//   并入表面帧；无几何帧时单独 opacity 帧）。
+//   opacity（opacityFrom ↔ 自然值）；无直接元素子级时回退为「表面整体」（opacity
+//   opacityFrom ↔ 1 并入表面帧；无几何帧时单独 opacity 帧）。
 // - 伪元素玻璃表面（非 splitFade 且玻璃在 ::before/::after）：同 splitFade 的拆分，
 //   另加伪元素自身 opacity 规格（带 pseudoElement 字段，由 runtime 播放）。
 // - 非 splitFade 表面（玻璃在自身或不是玻璃）：仅表面整体一条。
 // 只有 animateShadow 为 true 的表面（或伪元素玻璃表面）且 geometry 非空时才读取并传入
 // naturalBoxShadow，使阴影与玻璃/内容同步淡入淡出，避免「先出现只有阴影的轮廓」。
+// options.timing（policy.timing 快照）提供时决定缩放/透明度起点，缺省回退 SURFACE_DEFS。
 export function animationSpecsFor(surface, kind, direction, independentTransforms, options = {}) {
   if (!isElement(surface)) return [];
   const def = surfaceDefFor(kind);
@@ -222,10 +226,8 @@ export function animationSpecsFor(surface, kind, direction, independentTransform
   const computedStyle =
     options && typeof options.computedStyle === "function" ? options.computedStyle : defaultComputedStyle;
   const geometry = options && options.geometry ? options.geometry : null;
-  const timing = {
-    scaleFrom: def.scaleFrom,
-    opacityFrom: def.opacityFrom,
-  };
+  // v1.1.0：policy.timing 提供缩放/透明度起点时直接用它；缺省回退 SURFACE_DEFS。
+  const timing = options && options.timing && typeof options.timing === "object" ? options.timing : null;
   // 只有「整体 opacity 动画」的表面才需要伪元素玻璃检测（splitFade 表面本就不动画自身 opacity）。
   const pseudoGlass = def.splitFade ? null : pseudoGlassFor(surface, computedStyle);
   const boxShadow =
@@ -242,26 +244,35 @@ export function animationSpecsFor(surface, kind, direction, independentTransform
 
   const surfaceFrames = geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out, geometry);
   const children = directElementChildren(surface);
+  const values = geometryValuesFor(def, timing);
   const specs = [];
   if (surfaceFrames.length > 0) specs.push({ element: surface, keyframes: surfaceFrames });
   for (const child of children) {
     specs.push({
       element: child,
-      keyframes: fadeKeyframesFor(direction, naturalOpacity(child, null, computedStyle)),
+      keyframes: fadeKeyframesFor(
+        direction,
+        naturalOpacity(child, null, computedStyle),
+        values.opacityFrom,
+      ),
     });
   }
   if (pseudoGlass !== null) {
     specs.push({
       element: surface,
       pseudoElement: pseudoGlass,
-      keyframes: fadeKeyframesFor(direction, naturalOpacity(surface, pseudoGlass, computedStyle)),
+      keyframes: fadeKeyframesFor(
+        direction,
+        naturalOpacity(surface, pseudoGlass, computedStyle),
+        values.opacityFrom,
+      ),
     });
   }
   if (children.length > 0 || pseudoGlass !== null) return specs;
 
   // 无直接元素子级：没有可下沉的层级，淡入淡出回到表面自身。
-  const from = out ? 1 : 0;
-  const to = out ? 0 : 1;
+  const from = out ? 1 : values.opacityFrom;
+  const to = out ? values.opacityFrom : 1;
   if (surfaceFrames.length === 0) {
     return [{ element: surface, keyframes: [{ opacity: from }, { opacity: to }] }];
   }

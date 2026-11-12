@@ -3,9 +3,14 @@
  *
  * 语义与 v0.1.0 一致，但 `timing(kind)` 只从 `SURFACE_DEFS[kind]` 读取策略，
  * 不再持有独立的 KIND_POLICY 表（.plan/v0.2.0/plan-b-rewrite.md §3.3）。
+ *
+ * v1.1.0 起 `timing(kind)` 是「设置 → 最终参数」的唯一收口：每次调用读取最新设置快照，
+ * 按「分表面 → 全局 → token / SURFACE_DEFS」算出 durationMs / scaleFrom / opacityFrom。
+ * 设置缺省（全 null）时行为与 v1.0.0 完全一致。
  */
 
 import { MOTION_MEDIA_QUERY, SURFACE_DEFS, TOKEN_FALLBACK } from "./defs.js";
+import { SURFACE_SETTING_KEYS, normalizeSettings } from "./settings.js";
 import {
   clampNumber,
   defaultComputedStyle,
@@ -16,9 +21,16 @@ import {
   readStyleProperty,
 } from "./utils.js";
 
+// 内部 kind → 设置里的分表面组：菜单与列表共用 menu 组。
+function surfaceSettingKey(kind) {
+  if (kind === "listbox") return "menu";
+  return SURFACE_SETTING_KEYS.includes(kind) ? kind : "menu";
+}
+
 export function createPolicy(options = {}) {
   const optionTokenSource = options.tokenSource;
   const optionMatchMedia = options.matchMedia;
+  const optionSettings = options.settings;
   const computedStyle =
     typeof options.computedStyle === "function" ? options.computedStyle : defaultComputedStyle;
 
@@ -101,15 +113,34 @@ export function createPolicy(options = {}) {
     };
   }
 
+  // 当前设置快照：对象或返回对象的函数；缺省 / 异常 / 已释放都按全自动处理。
+  function settingsSnapshot() {
+    try {
+      if (disposed) return normalizeSettings(undefined);
+      return normalizeSettings(typeof optionSettings === "function" ? optionSettings() : optionSettings);
+    } catch (error) {
+      return normalizeSettings(undefined);
+    }
+  }
+
   function timing(kind) {
     const def = SURFACE_DEFS[kind] || SURFACE_DEFS.menu;
-    const duration = clampNumber(durationFor(def), def.minMs, def.maxMs);
+    const settings = settingsSnapshot();
+    const surface = settings.surfaces[surfaceSettingKey(kind)];
+    // 用户显式时长不再套用 kind 的 min/max，否则 120–160ms 的 clamp 会让设置失效。
+    const duration =
+      surface.durationMs ?? settings.durationMs ?? clampNumber(durationFor(def), def.minMs, def.maxMs);
+    // 全屏遮罩从 scale(<1) 入场会露出页面边缘：全局缩放不作用于遮罩，只有分表面显式设置才缩放。
+    const scaleFrom =
+      surface.scaleFrom ??
+      (def.scaleFrom === 1 ? def.scaleFrom : settings.scaleFrom ?? def.scaleFrom);
+    const opacityFrom = surface.opacityFrom ?? settings.opacityFrom ?? def.opacityFrom;
     const snapshot = tokens();
     return {
       durationMs: readReducedMotion() ? 0 : duration,
       easing: def.easing === null ? snapshot.easing : def.easing,
-      scaleFrom: def.scaleFrom,
-      opacityFrom: def.opacityFrom,
+      scaleFrom: scaleFrom,
+      opacityFrom: opacityFrom,
     };
   }
 
