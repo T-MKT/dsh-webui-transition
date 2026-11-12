@@ -216,66 +216,66 @@ export function createSettingsPage({ readSettings, writeSettings, emit })
 
 #### 3.0.1 单独提交 plan 文档
 
-- [ ] 只 `git add .agents/plan/v1.1.0/animation-params.md`，提交 `docs(plan): v1.1.0 可调配动画参数`；不 push。
+- [x] 只 `git add .agents/plan/v1.1.0/animation-params.md`，提交 `docs(plan): v1.1.0 可调配动画参数`；不 push。
 - **完成判据**：`git log -1 --name-only` 只显示该文件。
 
 ### 3.1 设置契约（线性主干）
 
 #### 3.1.1 扩展两包设置契约
 
-- [ ] `src/settings.js`：新增 `SURFACE_SETTING_KEYS` / `SETTINGS_RANGES`；重写 `DEFAULT_SETTINGS` 与 `defaults()`；`normalizeSettings` 逐字段清洗、四舍五入、clamp；`readSettings` / `writeSettings` 保持原错误兜底。
-- [ ] `packages/dsh-webui-transition-settings/src/contract.js`：与主包同值、同行为独立实现，不跨包 import。
-- [ ] `test/settings.test.mjs`：更新默认形状与冻结断言；新增 clamp（-50→0、5000→1000、0.9123→0.91、2→1、-1→0）、逐字段恢复（`fallback` 非法但 `durationMs` 合法时保留后者）、`surfaces` 非法/未知 key、canonical JSON。
-- [ ] `test/contract.test.mjs`：新增 `SURFACE_SETTING_KEYS` / `SETTINGS_RANGES` 一致断言；normalize/read/write 用例覆盖新字段并验证两包 JSON 文本完全一致。
+- [x] `src/settings.js`：新增 `SURFACE_SETTING_KEYS` / `SETTINGS_RANGES`；重写 `DEFAULT_SETTINGS` 与 `defaults()`；`normalizeSettings` 逐字段清洗、四舍五入、clamp；`readSettings` / `writeSettings` 保持原错误兜底。
+- [x] `packages/dsh-webui-transition-settings/src/contract.js`：与主包同值、同行为独立实现，不跨包 import。
+- [x] `test/settings.test.mjs`：更新默认形状与冻结断言；新增 clamp（-50→0、5000→1000、0.9123→0.91、2→1、-1→0）、逐字段恢复（`fallback` 非法但 `durationMs` 合法时保留后者）、`surfaces` 非法/未知 key、canonical JSON。
+- [x] `test/contract.test.mjs`：新增 `SURFACE_SETTING_KEYS` / `SETTINGS_RANGES` 一致断言；normalize/read/write 用例覆盖新字段并验证两包 JSON 文本完全一致。
 - **完成判据**：`node --test test/settings.test.mjs test/contract.test.mjs` 通过。
 
 ### 3.2 动画参数生效（线性主干）
 
 #### 3.2.1 policy 读取设置并计算最终 timing
 
-- [ ] `src/policy.js`：新增 `options.settings`（对象或函数）；`timing(kind)` 内先 `normalizeSettings` 当前快照；按 §2.4 优先级计算 duration/scale/opacity；`listbox` 映射到 `menu` 组；用户时长绕过 kind clamp；reduced-motion 仍归零。
-- [ ] `test/policy.test.mjs`：新增「无设置时行为不变」「全局时长覆盖四类表面」「分表面覆盖优先」「全局缩放不作用于遮罩、遮罩显式覆盖生效」「透明度两层」「0 时长」「reduced-motion 高于设置」「settings 函数实时读取」「非法值回退」用例。
+- [x] `src/policy.js`：新增 `options.settings`（对象或函数）；`timing(kind)` 内先 `normalizeSettings` 当前快照；按 §2.4 优先级计算 duration/scale/opacity；`listbox` 映射到 `menu` 组；用户时长绕过 kind clamp；reduced-motion 仍归零。
+- [x] `test/policy.test.mjs`：新增「无设置时行为不变」「全局时长覆盖四类表面」「分表面覆盖优先」「全局缩放不作用于遮罩、遮罩显式覆盖生效」「透明度两层」「0 时长」「reduced-motion 高于设置」「settings 函数实时读取」「非法值回退」用例。
 - **完成判据**：`node --test test/policy.test.mjs` 通过。
 
 #### 3.2.2 frames / runtime 透传 timing
 
-- [ ] `src/frames.js`：`animationSpecsFor` 读取 `options.timing`，用其 `scaleFrom` / `opacityFrom` 构造表面帧与子级透明帧；未提供时回退 `SURFACE_DEFS`。
-- [ ] `src/runtime.js`：`specsFor` 增加 `timing` 参数；`applyEntry` 与 `playGhost` 把同一个 `timingFor(kind)` 传给 frames。
-- [ ] `test/frames.test.mjs`：新增 `options.timing` 覆盖缩放/透明度用例；保留现有默认行为用例。
-- [ ] `test/runtime.test.mjs`：新增「policy 的 scale/opacity/duration 透传到动画器与关键帧」用例（装配带 settings 的 policy）。
+- [x] `src/frames.js`：`animationSpecsFor` 读取 `options.timing`，用其 `scaleFrom` / `opacityFrom` 构造表面帧与子级透明帧；未提供时回退 `SURFACE_DEFS`。
+- [x] `src/runtime.js`：`specsFor` 增加 `timing` 参数；`applyEntry` 与 `playGhost` 把同一个 `timingFor(kind)` 传给 frames。
+- [x] `test/frames.test.mjs`：新增 `options.timing` 覆盖缩放/透明度用例；保留现有默认行为用例。
+- [x] `test/runtime.test.mjs`：新增「policy 的 scale/opacity/duration 透传到动画器与关键帧」用例（装配带 settings 的 policy）。
 - **完成判据**：`node --test test/frames.test.mjs test/runtime.test.mjs` 通过。
 
 #### 3.2.3 browser 接线与即时生效
 
-- [ ] `src/browser.js`：`settings` 闭包 + `createPolicy({ settings: () => settings })`；把 policy 传给 `createTransitionRuntime`；事件与 `storage` 监听只更新闭包。
-- [ ] `test/bundle.test.mjs`：确认主产物冒烟仍通过（apply / effect 名称 / 事件订阅不变）。
+- [x] `src/browser.js`：`settings` 闭包 + `createPolicy({ settings: () => settings })`；把 policy 传给 `createTransitionRuntime`；事件与 `storage` 监听只更新闭包。
+- [x] `test/bundle.test.mjs`：确认主产物冒烟仍通过（apply / effect 名称 / 事件订阅不变）。
 - **完成判据**：`pnpm build && node --test test/bundle.test.mjs` 通过。
 
 ### 3.3 设置页 UI（节点内并行，依赖 §3.1 契约与 §2.5 UI 契约）
 
 #### 3.3.1 UI 与测试并行
 
-- [ ] **Agent A**：`packages/dsh-webui-transition-settings/src/settings-page.js` — 按 §2.5 实现目标 tabs、三个数字字段、空值/提交/重置/非法值行为；`.../src/locale.js` — 按 §2.5 的 key 集合补齐中英文案。（依赖：§2.4 契约常量、§2.5 UI 契约）
-- [ ] **Agent B**：`test/settings-page.test.mjs` — 更新 primitives 桩（`SegmentedTabs` / `SettingsValueField`），覆盖渲染、目标切换、失焦/Enter 提交、clamp、非法值、重置、跨标签同步、缺 `t`；`test/settings-plugin.test.mjs` — locale key 清单更新、primitives require 桩补齐；`test/bundle.test.mjs` — 设置产物 require 桩补齐。（依赖：§2.5 UI 契约与 locale key 集合）
+- [x] **Agent A**：`packages/dsh-webui-transition-settings/src/settings-page.js` — 按 §2.5 实现目标 tabs、三个数字字段、空值/提交/重置/非法值行为；`.../src/locale.js` — 按 §2.5 的 key 集合补齐中英文案。（依赖：§2.4 契约常量、§2.5 UI 契约）
+- [x] **Agent B**：`test/settings-page.test.mjs` — 更新 primitives 桩（`SegmentedTabs` / `SettingsValueField`），覆盖渲染、目标切换、失焦/Enter 提交、clamp、非法值、重置、跨标签同步、缺 `t`；`test/settings-plugin.test.mjs` — locale key 清单更新、primitives require 桩补齐；`test/bundle.test.mjs` — 设置产物 require 桩补齐。（依赖：§2.5 UI 契约与 locale key 集合）
 - **完成判据**：两人收敛后 `pnpm build && node --test test/settings-page.test.mjs test/settings-plugin.test.mjs test/bundle.test.mjs` 通过。
 
 ### 3.4 文档、版本与构建产物（线性主干）
 
 #### 3.4.1 文档 + 版本 + 构建 + 全量验证
 
-- [ ] 根 `README.md` / `README.en.md`：设置表新增三参数（范围、默认、含义）；补「全局 + 分表面覆盖、局部优先、留空=自动」；补遮罩缩放例外、0 时长含义、存储 JSON 示例；效果表时长改为「默认约 Xms，可配」。
-- [ ] 设置包 `README.md` / `README.en.md`：同步设置项表、优先级与存储示例。
-- [ ] 根/设置包 `locale/{en,zh}.json`：插件清单描述补「可调配动画参数」。
-- [ ] `AGENTS.md`：项目地图中 `settings.js` / `policy.js` / `frames.js` / `runtime.js` / `browser.js` / `settings-page.js` 与对应测试的职责描述同步。
-- [ ] 两包 `package.json`：版本 `1.1.0`、描述补参数能力；根 README 的发布依赖说明改为 `^1.1.0`。
-- [ ] 如 `pnpm install` 更新了 `pnpm-lock.yaml`，一并提交。
-- [ ] `pnpm build` 重新生成两份 `client.js`；逐条确认产物差异只有预期内容。
+- [x] 根 `README.md` / `README.en.md`：设置表新增三参数（范围、默认、含义）；补「全局 + 分表面覆盖、局部优先、留空=自动」；补遮罩缩放例外、0 时长含义、存储 JSON 示例；效果表时长改为「默认约 Xms，可配」。
+- [x] 设置包 `README.md` / `README.en.md`：同步设置项表、优先级与存储示例。
+- [x] 根/设置包 `locale/{en,zh}.json`：插件清单描述补「可调配动画参数」。
+- [x] `AGENTS.md`：项目地图中 `settings.js` / `policy.js` / `frames.js` / `runtime.js` / `browser.js` / `settings-page.js` 与对应测试的职责描述同步。
+- [x] 两包 `package.json`：版本 `1.1.0`、描述补参数能力；根 README 的发布依赖说明改为 `^1.1.0`。
+- [x] 如 `pnpm install` 更新了 `pnpm-lock.yaml`，一并提交。
+- [x] `pnpm build` 重新生成两份 `client.js`；逐条确认产物差异只有预期内容。
 - **完成判据**：`pnpm test` 全绿；`git status` 的改动文件 = §2.1 所列文件 + 两份 `client.js`，无其它改动。
 
 ### 3.5 提交（线性主干）
 
 #### 3.5.1 一次提交
 
-- [ ] 只 `git add` §3.4 验证过的文件（含构建产物；plan 文档已在 §3.0 单独提交，不混入本次提交）。
-- [ ] 一次 Conventional Commits 提交，提交信息 body 注明完成本计划节点（如 `plan: v1.1.0/animation-params.md §3.1–3.4`）；不 push。
+- [x] 只 `git add` §3.4 验证过的文件（含构建产物；plan 文档已在 §3.0 单独提交，不混入本次提交）。
+- [x] 一次 Conventional Commits 提交，提交信息 body 注明完成本计划节点（如 `plan: v1.1.0/animation-params.md §3.1–3.4`）；不 push。
 - **完成判据**：`git log -1 --stat` 显示单次提交，文件清单与预期一致。
