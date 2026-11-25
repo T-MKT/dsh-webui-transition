@@ -1,7 +1,7 @@
 {
   "name": "@tak1208/dsh-webui-transition-settings",
-  "version": "1.0.0",
-  "description": "DSH Web GUI 扩展：过渡动画设置页（Settings → 过渡动画），为 @tak1208/dsh-webui-transition 提供无锚点回退方式选择。",
+  "version": "1.1.0",
+  "description": "DSH Web GUI 扩展：过渡动画设置页（Settings → 过渡动画），为 @tak1208/dsh-webui-transition 提供无锚点回退方式选择与可调配的动画时长 / 初始缩放 / 透明度起点。",
   "icon": "./assets/icons/logo.png",
   "keywords": [
     "dsh",
@@ -43,7 +43,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "engines": {
-    "dsh": ">=0.2.2-alpha.2 <0.3.0"
+    "dsh": ">=0.2.2-rc.1 <0.3.0"
   },
   "dsh": {
     "client": {

@@ -1,7 +1,7 @@
 {
   "name": "@tak1208/dsh-webui-transition",
-  "version": "1.0.0",
-  "description": "DSH Web GUI 扩展：为设置面板与各级下拉菜单补上原点感知的开合过渡动画（Client-only bundle，源码 ESM + esbuild 构建，零第三方运行时依赖）。",
+  "version": "1.1.0",
+  "description": "DSH Web GUI 扩展：为设置面板与各级下拉菜单补上原点感知的开合过渡动画（Client-only bundle，源码 ESM + esbuild 构建，零第三方运行时依赖）；动画时长、初始缩放与透明度起点可调配。",
   "icon": "./assets/icons/logo.png",
   "keywords": [
     "dsh",
@@ -46,7 +46,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "engines": {
-    "dsh": ">=0.2.2-alpha.2 <0.3.0"
+    "dsh": ">=0.2.2-rc.1 <0.3.0"
   },
   "dsh": {
     "bundle": {

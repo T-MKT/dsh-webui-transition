@@ -13,7 +13,7 @@
 
 A third-party client plugin that adds open/close transitions to two places in the DSH (DeepSeek Harness) Web GUI: dropdown menus and the settings panel. It ships as a dsh bundle, runs entirely in the browser half, does not modify dsh source code, and has no third-party runtime dependencies.
 
-Since v0.3.0 the animation is **origin-aware**: when the trigger element can be inferred, the popup scales from the trigger's nearest edge/point as `transform-origin`; the exit reuses the origin cached on entry. When no trigger can be inferred, the configured fallback applies: **fade only** (default) or **pointer origin**. Since v1.0.0 the settings panel does a **center-origin scale**: it scales from its own center + fades in, independent of any trigger (the settings plugin marks the panel with `data-dsh-transition-origin="center"`; the main plugin only recognises the marker). The settings UI is provided by a separate plugin in the same bundle, `@tak1208/dsh-webui-transition-settings` (Settings → Transitions).
+Since v0.3.0 the animation is **origin-aware**: when the trigger element can be inferred, the popup scales from the trigger's nearest edge/point as `transform-origin`; the exit reuses the origin cached on entry. When no trigger can be inferred, the configured fallback applies: **fade only** (default) or **pointer origin**. Since v1.0.0 the settings panel does a **center-origin scale**: it scales from its own center + fades in, independent of any trigger (the settings plugin marks the panel with `data-dsh-transition-origin="center"`; the main plugin only recognises the marker). Since v1.1.0 the animation **duration, initial scale, and opacity start** are all configurable in the settings page (global defaults with per-surface overrides, applied immediately). The settings UI is provided by a separate plugin in the same bundle, `@tak1208/dsh-webui-transition-settings` (Settings → Transitions).
 
 ## Scope
 
@@ -21,33 +21,59 @@ It only takes over the two surfaces the host does not animate, covering both ent
 
 | Surface | Semantic selector | Enter | Exit |
 | --- | --- | --- | --- |
-| Dropdown menus (including the model menu inside Settings) | `role="menu"` | Scales from the trigger's nearest edge/point (`.98`) + fades in, about 150ms by default | Reuses the entry origin, mirrored |
-| Settings panel | `role="dialog"` + `data-dsh-transition-origin="center"` (marked by the settings plugin) | Scales from the panel's own center (`.98`) + fades in (about 220ms), independent of any trigger, always applied | Mirrored |
-| Other `role="dialog"` popover panels (such as the Agent Team board and the context usage panel) | `role="dialog"` (optionally with a mask) | Mask fades in (about 180ms); panel scales from the trigger (`.98`) + fades in (about 220ms) | Mirrored |
+| Dropdown menus (including the model menu inside Settings) | `role="menu"` | Scales from the trigger's nearest edge/point (`.98`) + fades in, about 150ms by default, configurable | Reuses the entry origin, mirrored |
+| Settings panel | `role="dialog"` + `data-dsh-transition-origin="center"` (marked by the settings plugin) | Scales from the panel's own center (`.98`) + fades in (about 220ms by default, configurable), independent of any trigger, always applied | Mirrored |
+| Other `role="dialog"` popover panels (such as the Agent Team board and the context usage panel) | `role="dialog"` (optionally with a mask) | Mask fades in (about 180ms by default, configurable); panel scales from the trigger (`.98`) + fades in (about 220ms by default, configurable) | Mirrored |
 
 - **Origin-aware**: the trigger is inferred in priority order — DOM adjacency (submenu / non-portal wrapper) → `aria-controls` → `[aria-expanded="true"][aria-haspopup]` (24px adjacency gate + 1400px distance cap) → most recent pointer target (within 2.5s) → keyboard focus. When nothing can be inferred, the configured fallback applies.
 - **Surface-level origin marker**: a plugin that owns a surface may set `data-dsh-transition-origin="center"` on it; the main plugin then **unconditionally** uses the surface's own center as `transform-origin`, skipping trigger inference and the fallback. Currently only the settings plugin marks the settings panel (the marker belongs to the owning plugin; the main plugin recognises no host attributes such as `data-shortcut-modal` or `aria-modal`).
 - **Fallback modes**: `Fade only` (default, no geometry at all) or `Pointer origin` (scale from the most recent pointer position); if neither is available it still degrades to fade only.
-- Duration and easing are read from host tokens (`--ds-transition-duration`, `--ds-transition-duration-fast`, `--ds-ease-in-out`) and clamped; the fallbacks are the values above.
+- Duration and easing are read from host tokens (`--ds-transition-duration`, `--ds-transition-duration-fast`, `--ds-ease-in-out`) and clamped; the fallbacks are the values above. All three animation parameters can be overridden in the settings page (see below).
 - The host unmounts these nodes instantly on close, so exit uses a "ghost copy": an `inert` clone is inserted back in place and removed once the animation settles. It intercepts no input and stays out of the accessibility tree.
 - Each element animates once per frame, so duplicate triggers do not replay it.
 
 ## Settings
 
-The settings page is provided by the separate plugin `@tak1208/dsh-webui-transition-settings`, at **Settings → Transitions**, with the outline icon in the nav row. It currently has one item:
+The settings page is provided by the separate plugin `@tak1208/dsh-webui-transition-settings`, at **Settings → Transitions**, with the outline icon in the nav row. It has two groups — fallback mode and animation parameters:
 
 | Setting | Values | Default | Meaning |
 | --- | --- | --- | --- |
 | Fallback when no anchor is found | `Fade only` / `Pointer origin` | `Fade only` | How a popup enters when its trigger cannot be inferred |
+| Duration | integer 0–1000 ms | Auto | Transition duration; `0` disables transitions for that surface group |
+| Initial scale | 0.5–1.0 (two decimals) | Auto | Start of the entry scale; `1` means no scaling |
+| Opacity start | 0–1.0 (two decimals) | Auto | Start of the entry opacity; `0` means fully transparent |
 
-- Storage: `localStorage` key `dsh.webui-transition.settings.v1`, JSON `{ "fallback": "fade" | "pointer" }`.
-- Same-tab changes take effect immediately through a Cordis event; cross-tab changes fall back to the `storage` event.
-- **Without the settings plugin, or before any setting is saved, the main plugin runs normally with the default `fade`**; the settings plugin is only an optional UI entry.
-- Browser "clear browsing data / site data", closing incognito, changing origin (port/host), or switching browser/profile all clear the setting; the only consequence is falling back to the default `fade`, and the main plugin keeps working.
+Animation parameters have two layers: **global** and **per surface group** (menus & lists / dialogs / masks; "menus & lists" covers both `role="menu"` and `role="listbox"`).
+
+- **Priority**: surface value → global value → built-in default. An empty surface field follows the global value; an empty global field keeps the previous behaviour: duration from the host token (`--ds-transition-duration` / `--ds-transition-duration-fast`) clamped per surface, scale/opacity from built-in defaults (menus and dialogs 0.98, masks 1; opacity starts at 0).
+- An explicitly configured duration is validated against 0–1000 ms and does **not** use the per-surface 120–240 ms clamp; `0` disables both enter and exit transitions for that surface group.
+- **Mask exception**: a full-screen mask entering from `scale(<1)` exposes the page edges, so the global scale does not apply to masks (masks stay fixed at 1); only an explicit mask scale overrides that.
+- Leaving a field empty means automatic; commit on blur or Enter; non-numeric input is not written and reverts on blur; the reset button restores one field to automatic.
+- `prefers-reduced-motion` outranks settings: when it is on, every transition duration becomes 0.
+- Storage: `localStorage` key `dsh.webui-transition.settings.v1`, JSON such as:
+
+```json
+{
+  "fallback": "fade",
+  "durationMs": null,
+  "scaleFrom": 0.96,
+  "opacityFrom": null,
+  "surfaces": {
+    "menu": { "durationMs": 120, "scaleFrom": null, "opacityFrom": null },
+    "dialog": { "durationMs": null, "scaleFrom": null, "opacityFrom": null },
+    "mask": { "durationMs": null, "scaleFrom": null, "opacityFrom": null }
+  }
+}
+```
+
+- Same-tab changes take effect immediately through a Cordis event; cross-tab changes fall back to the `storage` event; no restart is needed.
+- **Without the settings plugin, or before any setting is saved, the main plugin runs normally with automatic parameters**; the settings plugin is only an optional UI entry.
+- Browser "clear browsing data / site data", closing incognito, changing origin (port/host), or switching browser/profile all clear the setting; the only consequence is falling back to automatic parameters, and the main plugin keeps working.
+- Older plugin versions (v1.0.0 and earlier) drop the new fields when they write settings back; this is a known and accepted degradation (the key stays `…v1` and no migration is performed).
 
 ## Installation
 
-This repository is a dsh bundle: the root `package.json` declares `dsh.bundle.patch` (the Loader inserts two plugin rows: the main plugin and the settings plugin) and `dsh.client` (browser half, pointing at the build artifact `client.js`, classic script). The root package depends on the settings package via `workspace:^`; publishing must go through pnpm, which rewrites it to `^1.0.0` (see "Publishing" below).
+This repository is a dsh bundle: the root `package.json` declares `dsh.bundle.patch` (the Loader inserts two plugin rows: the main plugin and the settings plugin) and `dsh.client` (browser half, pointing at the build artifact `client.js`, classic script). The root package depends on the settings package via `workspace:^`; publishing must go through pnpm, which rewrites it to `^1.1.0` (see "Publishing" below).
 Developed against dsh `0.2.2-rc.1`, compatible with dsh `0.2.2-alpha.2` and above. (`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`).
 
 **Install from npm (recommended)**:
@@ -107,8 +133,8 @@ When the system "Reduce motion" setting is on (`prefers-reduced-motion: reduce`)
 
 The repository is a pnpm workspace with two packages:
 
-- Root package `@tak1208/dsh-webui-transition`: the bundle + main client plugin. The source is a set of ESM modules under `src/`, one responsibility per file: `defs.js` (constants and the `SURFACE_DEFS` surface descriptors), `utils.js` (shared small utilities), `policy.js` (token / reduced-motion / duration policy), `tracker.js` (surface state machine and DOM classification), `gate.js` (WAAPI / CSS animation / CSS transition conflict gate), `settings.js` (localStorage settings contract), `origin.js` (interaction capture, trigger resolution, and origin geometry), `marker.js` (surface-level center-origin marker contract and center geometry), `frames.js` (pure keyframe functions, including origin-aware geometry and the pseudo-element glass split), `runtime.js` (observation, batching, enter animations, and exit ghosts), and `browser.js` (browser entry, registered on `window.__ModuleLoader__`). The entry is bundled by esbuild into the classic iife artifact `client.js` at the repository root.
-- Settings package `packages/dsh-webui-transition-settings`: a separate client plugin. `src/browser.js` registers the `settings.section` page and its `settings.section.icon` nav icon (built from `assets/icons/outline.svg` by `pnpm build`), `src/settings-page.js` renders it with `SegmentedControl` from `@deepseek-ai/dsh-client-ui-primitives`, `src/contract.js` independently implements the same settings contract as the root `src/settings.js` (kept in sync by `test/contract.test.mjs`), and `src/panel-marker.js` observes `document.body` to mark the settings panel with the center origin. Its build artifact is the package's `client.js` (esbuild cjs wrapped in a `__ModuleLoader__.load` factory).
+- Root package `@tak1208/dsh-webui-transition`: the bundle + main client plugin. The source is a set of ESM modules under `src/`, one responsibility per file: `defs.js` (constants and the `SURFACE_DEFS` surface descriptors), `utils.js` (shared small utilities), `policy.js` (createPolicy: token / reduced-motion / reads settings to compute the final duration and geometry), `tracker.js` (surface state machine and DOM classification), `gate.js` (WAAPI / CSS animation / CSS transition conflict gate), `settings.js` (localStorage settings contract: fallback mode + three animation parameters + per-surface groups, with per-field normalisation and clamping), `origin.js` (interaction capture, trigger resolution, and origin geometry), `marker.js` (surface-level center-origin marker contract and center geometry), `frames.js` (pure keyframe functions, including origin-aware geometry, the pseudo-element glass split, and timing overrides), `runtime.js` (observation, batching, enter animations, and exit ghosts), and `browser.js` (browser entry, registered on `window.__ModuleLoader__`). The entry is bundled by esbuild into the classic iife artifact `client.js` at the repository root.
+- Settings package `packages/dsh-webui-transition-settings`: a separate client plugin. `src/browser.js` registers the `settings.section` page and its `settings.section.icon` nav icon (built from `assets/icons/outline.svg` by `pnpm build`), `src/settings-page.js` renders it with `SegmentedControl` (fallback mode), `SegmentedTabs` (global / per-surface targets), and `SettingsValueField` (three numeric fields) from `@deepseek-ai/dsh-client-ui-primitives`, `src/contract.js` independently implements the same settings contract as the root `src/settings.js` (kept in sync by `test/contract.test.mjs`), and `src/panel-marker.js` observes `document.body` to mark the settings panel with the center origin. Its build artifact is the package's `client.js` (esbuild cjs wrapped in a `__ModuleLoader__.load` factory).
 
 Both `client.js` files are build artifacts generated by `pnpm build`; **do not edit them by hand**. Change the implementation under `src/` and rebuild.
 
@@ -122,7 +148,7 @@ Tests use Node's built-in `node --test` with `jsdom`: `test/helpers/env.mjs` set
 
 ## Publishing
 
-Publish the two packages in order: `@tak1208/dsh-webui-transition-settings` first, then the root package `@tak1208/dsh-webui-transition` (the root package depends on the settings package's `^1.0.0`).
+Publish the two packages in order: `@tak1208/dsh-webui-transition-settings` first, then the root package `@tak1208/dsh-webui-transition` (the root package depends on the settings package's `^1.1.0`).
 
 Packing must go through pnpm: `pnpm publish`, or `pnpm pack` followed by `npm publish <tarball>` (use the latter when npm CLI's 2FA web authentication is needed). **Do not publish from the directory with `npm pack` / `npm publish`**: npm does not rewrite the `workspace:` protocol, the tarball keeps `workspace:^`, and consumers fail to install (`EUNSUPPORTEDPROTOCOL`: `Unsupported URL Type "workspace:"`).
 

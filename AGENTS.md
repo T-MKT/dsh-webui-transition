@@ -30,20 +30,22 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │   ├── v0.2.0/
 │   │   ├── plan-b-rewrite.md                 # v0.2.0 主体真源（ESM 重写计划）
 │   │   └── pseudo-glass-blur.md              # v0.2.0 伪元素玻璃模糊修复真源
-│   └── v0.3.0/
-│       └── origin-aware-and-settings.md      # v0.3.0 真源（原点感知 + 设置插件 + CI）
+│   ├── v0.3.0/
+│   │   └── origin-aware-and-settings.md      # v0.3.0 真源（原点感知 + 设置插件 + CI）
+│   └── v1.1.0/
+│       └── animation-params.md               # v1.1.0 真源（可调配动画参数：时长 / 缩放 / 透明度）
 ├── .github/workflows/ci.yml                  # CI：install / build / test / 产物一致性
 ├── assets/icons/logo.png                     # 插件清单图标（package.json.icon）
 ├── src/                                      # ESM 源码（esbuild 入口：src/browser.js）
 │   ├── defs.js                               # 常量 + SURFACE_DEFS 表面描述符
 │   ├── utils.js                              # 通用小工具（CSS 解析 / 默认依赖 / 语义工具）
-│   ├── policy.js                             # createPolicy：token / reduced-motion / 时长
+│   ├── policy.js                             # createPolicy：token / reduced-motion / 读取设置计算最终 timing
 │   ├── tracker.js                            # createSurfaceTracker：表面状态机 + DOM 分类
 │   ├── gate.js                               # createGate：兼容性门卫（WAAPI / CSS animation / CSS transition）
-│   ├── settings.js                           # 主包侧设置契约：localStorage 读/清洗/写
+│   ├── settings.js                           # 主包侧设置契约：回退方式 + 三参数 + 分表面组（读/逐字段清洗/写）
 │   ├── origin.js                             # 交互捕获 / 触发源解析 / origin 几何
 │   ├── marker.js                             # 表面级中心原点标记契约 + 中心几何
-│   ├── frames.js                             # 纯帧函数：关键帧 + 动画规格拆分（含原点感知与伪元素玻璃）
+│   ├── frames.js                             # 纯帧函数：关键帧 + 动画规格拆分（含原点感知、伪元素玻璃、timing 覆盖）
 │   ├── runtime.js                            # createTransitionRuntime：观察 / 批量 / 入场 / 幽灵 / 清理
 │   └── browser.js                            # 浏览器入口：__ModuleLoader__.load 注册
 ├── packages/dsh-webui-transition-settings/   # 设置插件包（独立 client）
@@ -57,9 +59,9 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 │   └── src/
 │       ├── browser.js                        # factory 入口：inject/apply + settings.section / settings.section.icon 注册
 │       ├── nav-icon.js                       # 设置导航图标组件（pnpm build 从 outline.svg 生成，不手改）
-│       ├── settings-page.js                  # React 页面（SegmentedControl）
+│       ├── settings-page.js                  # React 页面（SegmentedControl 回退方式 + SegmentedTabs 目标 + SettingsValueField 三参数）
 │       ├── panel-marker.js                   # 观察 body：给设置面板打中心原点标记
-│       ├── contract.js                       # 与主包重复的 key/event/default/modes/标记常量 + read/write
+│       ├── contract.js                       # 与主包重复的 key/event/default/modes/ranges/分表面 + read/write
 │       └── locale.js                         # zh/en 运行时文案
 ├── scripts/
 │   ├── build.mjs                             # 构建入口：先生成 nav-icon.js，再打两个 esbuild 产物
@@ -67,15 +69,15 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 ├── test/
 │   ├── helpers/
 │   │   └── env.mjs                           # jsdom 装配 / fake loader / fake animate / fake storage
-│   ├── policy.test.mjs
+│   ├── policy.test.mjs                       # token / clamp / 设置优先级与实时读取
 │   ├── tracker.test.mjs
 │   ├── gate.test.mjs
-│   ├── settings.test.mjs                     # 主包设置契约
+│   ├── settings.test.mjs                     # 主包设置契约（默认形状 / 逐字段清洗 / 范围 clamp / canonical JSON）
 │   ├── origin.test.mjs                       # 触发源解析 / 闸门 / 新鲜度 / 几何
-│   ├── contract.test.mjs                     # 两包设置契约与中心原点标记常量防漂移
-│   ├── frames.test.mjs
-│   ├── runtime.test.mjs                      # 观察 / 入场 / 幽灵 / 清理 / 中心原点标记表面
-│   ├── settings-page.test.mjs                # 设置页渲染 / 切换写 storage + emit
+│   ├── contract.test.mjs                     # 两包设置契约（常量 / ranges / 清洗 / JSON 文本）与中心原点标记常量防漂移
+│   ├── frames.test.mjs                       # 关键帧 / 规格拆分 / timing 覆盖
+│   ├── runtime.test.mjs                      # 观察 / 入场 / 幽灵 / 清理 / 中心原点标记表面 / timing 透传
+│   ├── settings-page.test.mjs                # 设置页渲染 / 目标切换 / 字段提交与重置 / 跨标签同步
 │   ├── nav-icon.test.mjs                     # 设置导航图标渲染契约（生成组件）
 │   ├── settings-plugin.test.mjs              # 设置插件产物 / inject / slot 注册 / 设置面板打标
 │   └── bundle.test.mjs                       # 两个构建产物冒烟：classic 契约 + 冻结签名

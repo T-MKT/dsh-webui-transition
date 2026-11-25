@@ -52,7 +52,7 @@ function settingsRequire(specifier) {
   }
   if (specifier === "react-dom") return { default: {} };
   if (specifier === "@deepseek-ai/dsh-client-ui-primitives") {
-    return { SegmentedControl: () => null };
+    return { SegmentedControl: () => null, SegmentedTabs: () => null, SettingsValueField: () => null };
   }
   throw new Error("unexpected require：" + specifier);
 }
@@ -175,28 +175,45 @@ pluginTest("apply 注册 locale 字典（NS + zh/en）", () => {
   assert.equal(state.locales.length, 1);
   const [{ namespace, dictionaries }] = state.locales;
   assert.equal(namespace, "webui-transition");
-  assert.deepEqual(Object.keys(dictionaries.zh).sort(), [
+  const LOCALE_KEYS = [
+    "auto",
+    "custom",
     "description",
+    "duration",
+    "durationGlobalHint",
+    "durationHostHint",
     "fallbackFade",
     "fallbackPointer",
+    "fallbackTitle",
     "hint",
+    "invalidNumber",
     "nav",
+    "opacity",
+    "opacityDefaultHint",
+    "opacityGlobalHint",
+    "paramsHint",
+    "paramsTitle",
+    "scale",
+    "scaleDefaultHint",
+    "scaleGlobalHint",
+    "scaleMaskHint",
+    "targetDialog",
+    "targetGlobal",
+    "targetMask",
+    "targetMenu",
     "title",
-  ]);
-  assert.deepEqual(Object.keys(dictionaries.en).sort(), [
-    "description",
-    "fallbackFade",
-    "fallbackPointer",
-    "hint",
-    "nav",
-    "title",
-  ]);
+    "useAuto",
+  ];
+  assert.deepEqual(Object.keys(dictionaries.zh).sort(), LOCALE_KEYS);
+  assert.deepEqual(Object.keys(dictionaries.en).sort(), LOCALE_KEYS);
   assert.equal(dictionaries.zh.nav, "过渡动画");
   assert.equal(dictionaries.en.nav, "Transitions");
   assert.equal(dictionaries.zh.title, "过渡动画");
   assert.equal(dictionaries.en.title, "Transitions");
   assert.equal(dictionaries.zh.fallbackFade, "仅淡入");
   assert.equal(dictionaries.en.fallbackPointer, "Pointer origin");
+  assert.equal(dictionaries.zh.targetMask, "遮罩");
+  assert.equal(dictionaries.en.targetMenu, "Menus & lists");
 });
 
 pluginTest("apply 向 settings.section 与 settings.section.icon 注入并注册 slot", () => {

@@ -290,10 +290,12 @@
     if (!trimmed || trimmed.toLowerCase() === "none") return null;
     return trimmed;
   }
-  function fadeKeyframesFor(direction, opacity) {
+  function fadeKeyframesFor(direction, opacity, opacityFrom = 0) {
     const value = Number.isFinite(opacity) ? opacity : 1;
-    if (direction === "out") return [{ opacity: value }, { opacity: 0 }];
-    return [{ opacity: 0 }, { opacity: value }];
+    const ratio = Number.isFinite(opacityFrom) ? Math.min(1, Math.max(0, opacityFrom)) : 0;
+    const start = value * ratio;
+    if (direction === "out") return [{ opacity: value }, { opacity: start }];
+    return [{ opacity: start }, { opacity: value }];
   }
   function keyframesFor(kind, timing, independentTransforms, boxShadow = null, geometry = null) {
     const def = surfaceDefFor(kind);
@@ -351,10 +353,7 @@
     const out = direction === "out";
     const computedStyle = options && typeof options.computedStyle === "function" ? options.computedStyle : defaultComputedStyle;
     const geometry = options && options.geometry ? options.geometry : null;
-    const timing = {
-      scaleFrom: def.scaleFrom,
-      opacityFrom: def.opacityFrom
-    };
+    const timing = options && options.timing && typeof options.timing === "object" ? options.timing : null;
     const pseudoGlass = def.splitFade ? null : pseudoGlassFor(surface, computedStyle);
     const boxShadow = geometry && (def.animateShadow || pseudoGlass !== null) ? naturalBoxShadow(surface, computedStyle) : null;
     if (!def.splitFade && pseudoGlass === null) {
@@ -363,24 +362,33 @@
     }
     const surfaceFrames = geometryKeyframesFor(kind, timing, independentTransforms, boxShadow, out, geometry);
     const children = directElementChildren(surface);
+    const values = geometryValuesFor(def, timing);
     const specs = [];
     if (surfaceFrames.length > 0) specs.push({ element: surface, keyframes: surfaceFrames });
     for (const child of children) {
       specs.push({
         element: child,
-        keyframes: fadeKeyframesFor(direction, naturalOpacity(child, null, computedStyle))
+        keyframes: fadeKeyframesFor(
+          direction,
+          naturalOpacity(child, null, computedStyle),
+          values.opacityFrom
+        )
       });
     }
     if (pseudoGlass !== null) {
       specs.push({
         element: surface,
         pseudoElement: pseudoGlass,
-        keyframes: fadeKeyframesFor(direction, naturalOpacity(surface, pseudoGlass, computedStyle))
+        keyframes: fadeKeyframesFor(
+          direction,
+          naturalOpacity(surface, pseudoGlass, computedStyle),
+          values.opacityFrom
+        )
       });
     }
     if (children.length > 0 || pseudoGlass !== null) return specs;
-    const from = out ? 1 : 0;
-    const to = out ? 0 : 1;
+    const from = out ? 1 : values.opacityFrom;
+    const to = out ? values.opacityFrom : 1;
     if (surfaceFrames.length === 0) {
       return [{ element: surface, keyframes: [{ opacity: from }, { opacity: to }] }];
     }
@@ -891,10 +899,104 @@
     }
   }
 
+  // src/settings.js
+  var SETTINGS_KEY = "dsh.webui-transition.settings.v1";
+  var SETTINGS_EVENT = "dsh-webui-transition/settings";
+  var FALLBACK_MODES = Object.freeze(["fade", "pointer"]);
+  var SURFACE_SETTING_KEYS = Object.freeze(["menu", "dialog", "mask"]);
+  var SETTINGS_RANGES = Object.freeze({
+    durationMs: Object.freeze({ min: 0, max: 1e3, decimals: 0 }),
+    scaleFrom: Object.freeze({ min: 0.5, max: 1, decimals: 2 }),
+    opacityFrom: Object.freeze({ min: 0, max: 1, decimals: 2 })
+  });
+  var DEFAULT_SETTINGS = Object.freeze({
+    fallback: "fade",
+    durationMs: null,
+    scaleFrom: null,
+    opacityFrom: null,
+    surfaces: Object.freeze({
+      menu: Object.freeze({ durationMs: null, scaleFrom: null, opacityFrom: null }),
+      dialog: Object.freeze({ durationMs: null, scaleFrom: null, opacityFrom: null }),
+      mask: Object.freeze({ durationMs: null, scaleFrom: null, opacityFrom: null })
+    })
+  });
+  function defaults() {
+    const surfaces = {};
+    for (const key of SURFACE_SETTING_KEYS) {
+      surfaces[key] = { durationMs: null, scaleFrom: null, opacityFrom: null };
+    }
+    return {
+      fallback: DEFAULT_SETTINGS.fallback,
+      durationMs: null,
+      scaleFrom: null,
+      opacityFrom: null,
+      surfaces
+    };
+  }
+  function normalizeNumber(value, range) {
+    if (typeof value !== "number" || !Number.isFinite(value)) return null;
+    const clamped = Math.min(range.max, Math.max(range.min, value));
+    const factor = 10 ** range.decimals;
+    return Math.round(clamped * factor) / factor;
+  }
+  function normalizeSurfaceGroup(value) {
+    const group = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return {
+      durationMs: normalizeNumber(group.durationMs, SETTINGS_RANGES.durationMs),
+      scaleFrom: normalizeNumber(group.scaleFrom, SETTINGS_RANGES.scaleFrom),
+      opacityFrom: normalizeNumber(group.opacityFrom, SETTINGS_RANGES.opacityFrom)
+    };
+  }
+  function resolveStorage() {
+    try {
+      const scope = globalScope();
+      return scope ? scope.localStorage : null;
+    } catch (error) {
+      return null;
+    }
+  }
+  function normalizeSettings(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const surfaces = {};
+    const rawSurfaces = source.surfaces && typeof source.surfaces === "object" && !Array.isArray(source.surfaces) ? source.surfaces : {};
+    for (const key of SURFACE_SETTING_KEYS) {
+      surfaces[key] = normalizeSurfaceGroup(rawSurfaces[key]);
+    }
+    return {
+      fallback: FALLBACK_MODES.includes(source.fallback) ? source.fallback : DEFAULT_SETTINGS.fallback,
+      durationMs: normalizeNumber(source.durationMs, SETTINGS_RANGES.durationMs),
+      scaleFrom: normalizeNumber(source.scaleFrom, SETTINGS_RANGES.scaleFrom),
+      opacityFrom: normalizeNumber(source.opacityFrom, SETTINGS_RANGES.opacityFrom),
+      surfaces
+    };
+  }
+  function readSettings(storage = void 0) {
+    const target = storage === void 0 ? resolveStorage() : storage;
+    if (!target || typeof target.getItem !== "function") return defaults();
+    try {
+      const raw = target.getItem(SETTINGS_KEY);
+      if (typeof raw !== "string" || !raw) return defaults();
+      let parsed = null;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (error) {
+        return defaults();
+      }
+      return normalizeSettings(parsed);
+    } catch (error) {
+      return defaults();
+    }
+  }
+
   // src/policy.js
+  function surfaceSettingKey(kind) {
+    if (kind === "listbox") return "menu";
+    return SURFACE_SETTING_KEYS.includes(kind) ? kind : "menu";
+  }
   function createPolicy(options = {}) {
     const optionTokenSource = options.tokenSource;
     const optionMatchMedia = options.matchMedia;
+    const optionSettings = options.settings;
     const computedStyle = typeof options.computedStyle === "function" ? options.computedStyle : defaultComputedStyle;
     const listeners = /* @__PURE__ */ new Set();
     let mediaQueryList = null;
@@ -964,15 +1066,27 @@
         slowMs: parseCssDuration(readStyleProperty(style, "--ds-transition-duration-slow"), TOKEN_FALLBACK.slowMs)
       };
     }
+    function settingsSnapshot() {
+      try {
+        if (disposed) return normalizeSettings(void 0);
+        return normalizeSettings(typeof optionSettings === "function" ? optionSettings() : optionSettings);
+      } catch (error) {
+        return normalizeSettings(void 0);
+      }
+    }
     function timing(kind) {
       const def = SURFACE_DEFS[kind] || SURFACE_DEFS.menu;
-      const duration = clampNumber(durationFor(def), def.minMs, def.maxMs);
+      const settings = settingsSnapshot();
+      const surface = settings.surfaces[surfaceSettingKey(kind)];
+      const duration = surface.durationMs ?? settings.durationMs ?? clampNumber(durationFor(def), def.minMs, def.maxMs);
+      const scaleFrom = surface.scaleFrom ?? (def.scaleFrom === 1 ? def.scaleFrom : settings.scaleFrom ?? def.scaleFrom);
+      const opacityFrom = surface.opacityFrom ?? settings.opacityFrom ?? def.opacityFrom;
       const snapshot = tokens();
       return {
         durationMs: readReducedMotion() ? 0 : duration,
         easing: def.easing === null ? snapshot.easing : def.easing,
-        scaleFrom: def.scaleFrom,
-        opacityFrom: def.opacityFrom
+        scaleFrom,
+        opacityFrom
       };
     }
     function subscribe(listener) {
@@ -1336,10 +1450,11 @@
     const origin = options.origin && typeof options.origin === "object" ? options.origin : null;
     const fallbackMode = typeof options.fallbackMode === "function" ? options.fallbackMode : () => "fade";
     let geometryCache = /* @__PURE__ */ new WeakMap();
-    function specsFor(element, kind, direction, geometry) {
+    function specsFor(element, kind, direction, geometry, timing) {
       return animationSpecsFor(element, kind, direction, supportsIndependentTransforms(), {
         ...specOptions,
-        geometry: geometry || null
+        geometry: geometry || null,
+        timing: timing || null
       });
     }
     function fallbackModeValue() {
@@ -1513,7 +1628,7 @@
       if (!timing || !(timing.durationMs > 0)) return;
       const geometry = entryGeometryFor(element);
       if (geometry) geometryCache.set(element, geometry);
-      const specs = specsFor(element, intent.kind, "in", geometry);
+      const specs = specsFor(element, intent.kind, "in", geometry, timing);
       let created = 0;
       for (const spec of specs) {
         const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);
@@ -1563,7 +1678,7 @@
         const timing = timingFor(surface.kind);
         if (!timing || !(timing.durationMs > 0)) continue;
         const geometry = exitGeometryFor(surface.element, target);
-        const specs = specsFor(target, surface.kind, "out", geometry);
+        const specs = specsFor(target, surface.kind, "out", geometry, timing);
         for (const spec of specs) {
           const animation = animator(spec.element, spec.keyframes, timing, spec.pseudoElement);
           if (!animation) continue;
@@ -1719,52 +1834,14 @@
     return { start, dispose: stop, enqueue };
   }
 
-  // src/settings.js
-  var SETTINGS_KEY = "dsh.webui-transition.settings.v1";
-  var SETTINGS_EVENT = "dsh-webui-transition/settings";
-  var FALLBACK_MODES = Object.freeze(["fade", "pointer"]);
-  var DEFAULT_SETTINGS = Object.freeze({ fallback: "fade" });
-  function defaults() {
-    return { fallback: DEFAULT_SETTINGS.fallback };
-  }
-  function resolveStorage() {
-    try {
-      const scope = globalScope();
-      return scope ? scope.localStorage : null;
-    } catch (error) {
-      return null;
-    }
-  }
-  function normalizeSettings(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return defaults();
-    if (!FALLBACK_MODES.includes(value.fallback)) return defaults();
-    return { fallback: value.fallback };
-  }
-  function readSettings(storage = void 0) {
-    const target = storage === void 0 ? resolveStorage() : storage;
-    if (!target || typeof target.getItem !== "function") return defaults();
-    try {
-      const raw = target.getItem(SETTINGS_KEY);
-      if (typeof raw !== "string" || !raw) return defaults();
-      let parsed = null;
-      try {
-        parsed = JSON.parse(raw);
-      } catch (error) {
-        return defaults();
-      }
-      return normalizeSettings(parsed);
-    } catch (error) {
-      return defaults();
-    }
-  }
-
   // src/browser.js
   function apply(ctx) {
     let settings = readSettings();
     const fallbackMode = () => settings.fallback;
     const view = typeof window !== "undefined" ? window : null;
     const tracker = createInteractionTracker({ window: view, document });
-    const runtime = createTransitionRuntime({ root: document, origin: tracker, fallbackMode });
+    const policy = createPolicy({ settings: () => settings });
+    const runtime = createTransitionRuntime({ root: document, policy, origin: tracker, fallbackMode });
     ctx.effect(() => {
       tracker.start();
       const stopRuntime = runtime.start();

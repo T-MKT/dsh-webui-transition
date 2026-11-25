@@ -7,6 +7,7 @@
  *
  * v0.3.0：读取设置（无锚点回退方式），订阅 Cordis 事件（同标签页即时生效）
  * 与 window `storage` 事件（跨标签页兜底）；设置变更只更新内存值，不重建 runtime。
+ * v1.1.0：设置闭包交给 policy，`timing(kind)` 每次读取最新快照（时长 / 缩放 / 透明度起点）。
  */
 
 import { animationSpecsFor, exitKeyframesFor, fadeKeyframesFor, keyframesFor } from "./frames.js";
@@ -23,7 +24,9 @@ function apply(ctx) {
 
   const view = typeof window !== "undefined" ? window : null;
   const tracker = createInteractionTracker({ window: view, document });
-  const runtime = createTransitionRuntime({ root: document, origin: tracker, fallbackMode });
+  // policy 每次 timing(kind) 读取 settings 闭包：设置变更即时生效，无需重建 runtime。
+  const policy = createPolicy({ settings: () => settings });
+  const runtime = createTransitionRuntime({ root: document, policy, origin: tracker, fallbackMode });
 
   ctx.effect(() => {
     tracker.start();

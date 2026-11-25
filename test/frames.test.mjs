@@ -419,3 +419,117 @@ test("伪元素玻璃：independentTransforms=false 时降级为子级 + 伪元�
   assert.equal(specs.length, 3, "2 个子级 + 1 个伪元素");
   assert.equal(specs[2].pseudoElement, "::before");
 });
+
+// ---------------------------------------------------------------------------
+// v1.1.0 可调配参数：options.timing 覆盖缩放 / 透明度起点
+// ---------------------------------------------------------------------------
+
+test("animationSpecsFor：options.timing 覆盖 menu 缩放与子级透明度起点", () => {
+  const menu = buildMenu();
+  document.body.append(menu);
+
+  const specs = animationSpecsFor(menu, "menu", "in", true, {
+    geometry: MENU_GEOMETRY,
+    timing: { scaleFrom: 0.9, opacityFrom: 0.3 },
+  });
+  assert.deepEqual(specs[0].keyframes, [
+    { transformOrigin: "10px 0px", scale: "0.9" },
+    { transformOrigin: "10px 0px", scale: "1" },
+  ]);
+  // 子级自然 opacity 为 1：透明度起点即 0.3。
+  assert.deepEqual(specs[1].keyframes, [{ opacity: 0.3 }, { opacity: 1 }]);
+  assert.deepEqual(specs[2].keyframes, [{ opacity: 0.3 }, { opacity: 1 }]);
+
+  const outSpecs = animationSpecsFor(menu, "menu", "out", true, {
+    geometry: MENU_GEOMETRY,
+    timing: { scaleFrom: 0.9, opacityFrom: 0.3 },
+  });
+  assert.deepEqual(outSpecs[0].keyframes, [
+    { transformOrigin: "10px 0px", scale: "1" },
+    { transformOrigin: "10px 0px", scale: "0.9" },
+  ]);
+  assert.deepEqual(outSpecs[1].keyframes, [{ opacity: 1 }, { opacity: 0.3 }]);
+});
+
+test("animationSpecsFor：options.timing 覆盖 dialog 整体透明度起点", () => {
+  const { overlay, panel } = buildSettingsOverlay();
+  document.body.append(overlay);
+
+  assert.deepEqual(
+    animationSpecsFor(panel, "dialog", "in", true, {
+      geometry: DIALOG_GEOMETRY,
+      timing: { scaleFrom: 1, opacityFrom: 0.25 },
+    }),
+    [
+      {
+        element: panel,
+        keyframes: [
+          { opacity: 0.25, transformOrigin: "20px 0px" },
+          { opacity: 1, transformOrigin: "20px 0px" },
+        ],
+      },
+    ],
+  );
+  assert.deepEqual(
+    animationSpecsFor(panel, "dialog", "out", true, {
+      timing: { scaleFrom: 1, opacityFrom: 0.25 },
+    }),
+    [{ element: panel, keyframes: [{ opacity: 1 }, { opacity: 0.25 }] }],
+  );
+});
+
+test("animationSpecsFor：遮罩显式 timing 缩放仍生效（分表面覆盖）", () => {
+  const { overlay, mask } = buildSettingsOverlay();
+  document.body.append(overlay);
+
+  const specs = animationSpecsFor(mask, "mask", "in", true, {
+    geometry: MASK_GEOMETRY,
+    timing: { scaleFrom: 0.96, opacityFrom: 0 },
+  });
+  assert.deepEqual(specs[0].keyframes, [
+    { opacity: 0, transformOrigin: "0px 0px", scale: "0.96" },
+    { opacity: 1, transformOrigin: "0px 0px", scale: "1" },
+  ]);
+});
+
+test("animationSpecsFor：无直接元素子级时表面透明度起点跟随 timing", () => {
+  const menu = document.createElement("div");
+  menu.setAttribute("role", "menu");
+  document.body.append(menu);
+
+  const specs = animationSpecsFor(menu, "menu", "in", true, {
+    geometry: MENU_GEOMETRY,
+    timing: { scaleFrom: 0.98, opacityFrom: 0.4 },
+  });
+  assert.deepEqual(specs[0].keyframes, [
+    { transformOrigin: "10px 0px", scale: "0.98", opacity: 0.4 },
+    { transformOrigin: "10px 0px", scale: "1", opacity: 1 },
+  ]);
+
+  const outSpecs = animationSpecsFor(menu, "menu", "out", true, {
+    timing: { scaleFrom: 0.98, opacityFrom: 0.4 },
+  });
+  assert.deepEqual(outSpecs[0].keyframes, [{ opacity: 1 }, { opacity: 0.4 }]);
+});
+
+test("animationSpecsFor：timing 缺字段时逐项回退 SURFACE_DEFS", () => {
+  const menu = buildMenu();
+  document.body.append(menu);
+  const specs = animationSpecsFor(menu, "menu", "in", true, {
+    geometry: MENU_GEOMETRY,
+    timing: { opacityFrom: 0.3 },
+  });
+  assert.equal(specs[0].keyframes[0].scale, "0.98", "缺失的 scaleFrom 回退内置默认");
+  assert.deepEqual(specs[1].keyframes, [{ opacity: 0.3 }, { opacity: 1 }]);
+});
+
+test("fadeKeyframesFor：opacityFrom 作为自然值的比例（缺省 0）", () => {
+  assert.deepEqual(fadeKeyframesFor("in", 1, 0.3), [{ opacity: 0.3 }, { opacity: 1 }]);
+  assert.deepEqual(fadeKeyframesFor("out", 1, 0.3), [{ opacity: 1 }, { opacity: 0.3 }]);
+  assert.deepEqual(fadeKeyframesFor("in", 0.5, 0.4), [{ opacity: 0.2 }, { opacity: 0.5 }]);
+  assert.deepEqual(fadeKeyframesFor("in", 0.5), [{ opacity: 0 }, { opacity: 0.5 }]);
+  // 非有限 / 越界的起点比例按 0 或 1 收敛。
+  assert.deepEqual(fadeKeyframesFor("in", 1, NaN), [{ opacity: 0 }, { opacity: 1 }]);
+  assert.deepEqual(fadeKeyframesFor("in", 1, -1), [{ opacity: 0 }, { opacity: 1 }]);
+  assert.deepEqual(fadeKeyframesFor("in", 1, 2), [{ opacity: 1 }, { opacity: 1 }]);
+});
