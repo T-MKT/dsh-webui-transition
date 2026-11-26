@@ -1,17 +1,17 @@
 /**
- * packages/dsh-webui-transition-settings/src/locale.js — 设置页运行时文案。
+ * src/settings-locale.js — 配置页运行时文案。
  *
- * 扁平字典（key → 文案），由设置插件在 apply 时通过
- * `ctx.locale.register(NS, { zh, en })` 注册；设置页组件从 props.t 取文案。
- * 中英必须保持同一 key 集合（test/settings-plugin.test.mjs 断言）。
+ * 扁平字典（key → 文案），由 src/browser.js 在 apply 时通过
+ * `ctx.locale.register(NS, { zh, en })` 注册；配置页组件从 props.t 取文案。
+ * 中英必须保持同一 key 集合（test/bundle.test.mjs 断言）。
  * 依据：.agents/plan/v0.3.0/origin-aware-and-settings.md §3.6.1；
- * 动画参数文案见 .agents/plan/v1.1.0/animation-params.md §2.5。
+ * 动画参数文案见 .agents/plan/v1.1.0/animation-params.md §2.5；
+ * 迁入根包见 .agents/plan/v1.2.0/plugin-page-config.md §2.2（去掉只服务于侧栏的 nav 键）。
  */
 
 export const NS = "webui-transition";
 
 export const zh = {
-  nav: "过渡动画",
   title: "过渡动画",
   description: "可调配动画时长、初始缩放与透明度起点。",
   fallbackTitle: "无锚点回退方式",
@@ -42,7 +42,6 @@ export const zh = {
 };
 
 export const en = {
-  nav: "Transitions",
   title: "Transitions",
   description: "Tune animation duration, initial scale, and opacity start.",
   fallbackTitle: "Fallback when no anchor",

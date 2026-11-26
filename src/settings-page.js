@@ -1,5 +1,5 @@
 /**
- * packages/dsh-webui-transition-settings/src/settings-page.js — 「过渡动画」设置页。
+ * src/settings-page.js — 「过渡动画」配置页（插件详情页内嵌表单）。
  *
  * createSettingsPage 返回一个 React 组件：标题 / 说明 + 回退方式 `SegmentedControl`
  * + 目标 `SegmentedTabs`（全局 / 菜单与列表 / 对话框 / 遮罩）+ 每个目标的三个可调
@@ -18,7 +18,8 @@
  *
  * 用 React.createElement 而非 JSX，使本文件可被 Node 直接 import 做渲染测试。
  * 依据：.agents/plan/v0.3.0/origin-aware-and-settings.md §2.4 / §2.7 / §3.6.1；
- * 动画参数见 .agents/plan/v1.1.0/animation-params.md §2.4 / §2.5。
+ * 动画参数见 .agents/plan/v1.1.0/animation-params.md §2.4 / §2.5；
+ * 迁入根包并改为 plugins.bundle.config 见 .agents/plan/v1.2.0/plugin-page-config.md §2.2。
  */
 
 import React from "react";
@@ -28,11 +29,11 @@ import {
   SettingsValueField,
 } from "@deepseek-ai/dsh-client-ui-primitives";
 
-import { SETTINGS_KEY, SETTINGS_RANGES, normalizeSettings } from "./contract.js";
+import { SETTINGS_KEY, SETTINGS_RANGES, normalizeSettings } from "./settings.js";
 
 const { useEffect, useState } = React;
 
-// 目标顺序即展示顺序；分表面组与 contract.js 的 SURFACE_SETTING_KEYS 一致。
+// 目标顺序即展示顺序；分表面组与 settings.js 的 SURFACE_SETTING_KEYS 一致。
 const TARGETS = ["global", "menu", "dialog", "mask"];
 const PARAMS = ["durationMs", "scaleFrom", "opacityFrom"];
 
@@ -120,7 +121,7 @@ function draftsFrom(settings) {
   return drafts;
 }
 
-// 与 contract.js 同规则：先按范围 clamp，再按 decimals 四舍五入。
+// 与 settings.js 同规则：先按范围 clamp，再按 decimals 四舍五入。
 function clampToRange(value, range) {
   const clamped = Math.min(range.max, Math.max(range.min, value));
   const factor = 10 ** range.decimals;

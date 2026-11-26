@@ -2,8 +2,7 @@
  * src/settings.js — 主包侧设置契约：localStorage 键 / 事件名 / 回退模式 /
  * 可调配动画参数（时长、初始缩放、透明度起点）/ 读写清洗。
  *
- * 主包（本文件）与设置插件包 `packages/dsh-webui-transition-settings/src/contract.js`
- * 各自独立实现同一份契约，测试保证两者常量与行为一致（防止契约漂移）。
+ * 唯一实现（v1.2.0 起设置页并入根包，不再有跨包副本）。
  *
  * 全部延迟访问 `globalThis.localStorage`：模块求值期不读全局；所有 storage 访问
  * 都包在 try/catch 中，任何异常一律回落到默认设置。

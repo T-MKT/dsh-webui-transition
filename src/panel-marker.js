@@ -1,19 +1,20 @@
 /**
- * packages/dsh-webui-transition-settings/src/panel-marker.js — 给设置面板打表面级中心原点标记。
+ * src/panel-marker.js — 给设置面板打表面级中心原点标记。
  *
- * 设置插件启动时观察 document.body（childList + subtree）；宿主每次打开设置弹窗都会
+ * 主插件启动时观察 document.body（childList + subtree）；宿主每次打开设置弹窗都会
  * 把 `[role="dialog"][data-shortcut-modal="settings"]` 面板插到 body 下，命中即打
  * `data-dsh-transition-origin="center"` 标记。主插件读标记后以面板正中心为
- * transform-origin 缩放，设置插件不直接参与动画。
+ * transform-origin 缩放，打标方不直接参与动画。
  *
  * observer 回调是微任务，早于主插件读取几何的 rAF flush，标记不会晚于入场第一帧；
  * 面板关闭即卸载，标记无需清理，stop() 只断开 observer。
  * 观察 / 回调 / 停止的异常一律就地吞掉，不向调用方抛错。
  *
- * 依据：.agents/plan/v1.0.0/settings-center-origin.md §2（冻结签名）。
+ * 依据：.agents/plan/v1.0.0/settings-center-origin.md §2（冻结签名）；
+ * 迁入根包见 .agents/plan/v1.2.0/plugin-page-config.md §2.2。
  */
 
-import { ORIGIN_MARKER_ATTRIBUTE, ORIGIN_MARKER_CENTER } from "./contract.js";
+import { ORIGIN_MARKER_ATTRIBUTE, ORIGIN_MARKER_CENTER } from "./marker.js";
 
 export const SETTINGS_PANEL_SELECTOR = '[role="dialog"][data-shortcut-modal="settings"]';
 

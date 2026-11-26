@@ -21,7 +21,7 @@ import { document, disposeEnvironment, resetEnvironment, window } from "./helper
 // 否则会退回 IE 的 propertychange 兼容路径（jsdom 没有 attachEvent，事件会抛错）。
 import { createRoot } from "react-dom/client";
 
-import { normalizeSettings } from "../packages/dsh-webui-transition-settings/src/contract.js";
+import { normalizeSettings } from "../src/settings.js";
 
 const PRIMITIVES = "@deepseek-ai/dsh-client-ui-primitives";
 const SETTINGS_KEY = "dsh.webui-transition.settings.v1";
@@ -126,9 +126,7 @@ globalThis.__DSH_SETTINGS_TEST_REACT__ = React;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 // 必须在 registerHooks 之后动态 import，源码里的 primitives 依赖才会命中桩。
-const { createSettingsPage } = await import(
-  "../packages/dsh-webui-transition-settings/src/settings-page.js"
-);
+const { createSettingsPage } = await import("../src/settings-page.js");
 
 const act = React.act;
 const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
