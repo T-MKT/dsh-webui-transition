@@ -12,7 +12,7 @@
 
 为 DSH（DeepSeek Harness）Web GUI 补上两处开合过渡动画的第三方客户端插件：各级下拉菜单与设置面板。它是一个 dsh bundle，纯浏览器半区运行，不修改 dsh 源码、无第三方运行时依赖。
 
-v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素时，以「触发元素离弹层最近的边/点」为 `transform-origin` 缩放；退场复用入场缓存的 origin。猜不到触发源时按设置回退：**仅淡入**（默认）或**点击原点**。v1.0.0 起设置面板改为**正中心缩放**：面板以自身正中心为 `transform-origin` 缩放 + 淡入，不依赖触发源（由设置插件在面板上打 `data-dsh-transition-origin="center"` 标记，主插件只识别标记）。v1.1.0 起动画**时长、初始缩放、透明度起点**均可在设置页调配（全局默认 + 按表面组覆盖，修改即时生效）。设置 UI 由同 bundle 内的独立插件 `@tak1208/dsh-webui-transition-settings` 提供（Settings → 过渡动画）。
+v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素时，以「触发元素离弹层最近的边/点」为 `transform-origin` 缩放；退场复用入场缓存的 origin。猜不到触发源时按设置回退：**仅淡入**（默认）或**点击原点**。v1.0.0 起设置面板改为**正中心缩放**：面板以自身正中心为 `transform-origin` 缩放 + 淡入，不依赖触发源（由插件自身在面板上打 `data-dsh-transition-origin="center"` 标记，动画逻辑只识别标记）。v1.1.0 起动画**时长、初始缩放、透明度起点**均可调配（全局默认 + 按表面组覆盖，修改即时生效）。v1.2.0 起设置表单内嵌在**插件管理**：打开侧栏 Plugins → `@tak1208/dsh-webui-transition` 详情页即可配置（Settings 侧栏不再有该页），仓库回到单包。
 
 ## 效果范围
 
@@ -21,11 +21,11 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 | 表面 | 语义选择器 | 入场 | 退场 |
 | --- | --- | --- | --- |
 | 各级下拉菜单（含设置内的模型菜单等） | `role="menu"` | 以触发源最近边/点为原点缩放（`.98`）+ 淡入，默认约 150ms，可配 | 复用入场 origin，镜像退场 |
-| 设置面板 | `role="dialog"` + `data-dsh-transition-origin="center"`（由设置插件打标） | 以面板正中心为原点缩放（`.98`）+ 淡入（默认约 220ms，可配），不依赖触发源、始终生效 | 镜像退场 |
+| 设置面板 | `role="dialog"` + `data-dsh-transition-origin="center"`（由本插件打标） | 以面板正中心为原点缩放（`.98`）+ 淡入（默认约 220ms，可配），不依赖触发源、始终生效 | 镜像退场 |
 | 其它 `role="dialog"` 弹出面板（如 Agent Team 看板、上下文用量面板） | `role="dialog"`（可带遮罩 mask） | mask 淡入（默认约 180ms，可配）；面板以触发源为原点缩放（`.98`）+ 淡入（默认约 220ms，可配） | 镜像退场 |
 
 - **原点感知**：触发源按优先级推断——DOM 邻接（子菜单 / 非 portal wrapper）→ `aria-controls` → `[aria-expanded="true"][aria-haspopup]`（24px 邻接闸门 + 1400px 距离上限）→ 最近指针目标（2.5s 内）→ 键盘焦点。推断不到时按设置回退。
-- **表面级原点标记**：表面所属插件可在表面元素上打 `data-dsh-transition-origin="center"`，主插件对该表面**无条件**以自身正中心为 `transform-origin`，跳过触发源推断与回退。当前只有设置插件给设置面板打该标记（标记由插件自己打；主插件不识别 `data-shortcut-modal`、`aria-modal` 等宿主属性）。
+- **表面级原点标记**：表面所属插件可在表面元素上打 `data-dsh-transition-origin="center"`，动画逻辑对该表面**无条件**以自身正中心为 `transform-origin`，跳过触发源推断与回退。当前由本插件给设置面板打该标记（标记由插件自己打；动画逻辑不识别 `data-shortcut-modal`、`aria-modal` 等宿主属性）。
 - **回退模式**：`仅淡入`（默认，不做任何几何动画）或 `点击原点`（以最近一次指针位置为缩放原点）；两者都取不到时仍退化为仅淡入。
 - 时长与缓动优先读宿主 token（`--ds-transition-duration`、`--ds-transition-duration-fast`、`--ds-ease-in-out`），并做区间 clamp；缺省值即上表。动画参数可在设置页覆盖（见下节）。
 - 关闭时宿主会把节点瞬时卸载，因此退场使用「幽灵副本」：克隆一份 `inert` 的副本插回原位，播完即删，不拦截交互、也不进入无障碍树。
@@ -33,7 +33,7 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 
 ## 设置
 
-设置页由独立插件 `@tak1208/dsh-webui-transition-settings` 提供，入口为 **Settings → 过渡动画**（英文 `Transitions`），侧栏导航行显示线稿图标。设置项分「无锚点回退方式」与「动画参数」两组：
+配置表单内嵌在插件管理：**插件管理（侧栏 Plugins）→ `@tak1208/dsh-webui-transition` → 详情页**，位于描述与行列表之间。设置项分「无锚点回退方式」与「动画参数」两组：
 
 | 设置 | 取值 | 默认 | 含义 |
 | --- | --- | --- | --- |
@@ -66,13 +66,13 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 ```
 
 - 同标签页即时生效走 Cordis 事件；跨标签页用 `storage` 事件兜底；设置修改无需重启。
-- **没有设置插件、或从未保存过设置时，主插件以默认自动参数正常运行**；设置插件只是可选的 UI 入口。
-- 浏览器「清除浏览数据 / 站点数据」、无痕关闭、换 origin（端口/host 变化）、换浏览器/profile 都会清掉该设置；后果只是回退默认自动参数，主插件仍工作。
+- **从未保存过设置时，插件以默认自动参数正常运行**；配置表单只是可选的 UI 入口。
+- 浏览器「清除浏览数据 / 站点数据」、无痕关闭、换 origin（端口/host 变化）、换浏览器/profile 都会清掉该设置；后果只是回退默认自动参数，插件仍工作。
 - 旧版本插件（v1.0.0 及更早）写回设置时会丢掉新字段；这是已知且接受的降级行为（key 仍为 `…v1`，不做迁移）。
 
 ## 安装
 
-本仓库形态为 dsh bundle：根包 `package.json` 声明 `dsh.bundle.patch`（Loader 插入两行插件：主插件 + 设置插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。根包以 `workspace:^` 依赖设置包，发布时必须经 pnpm 打包，由 pnpm 把 `workspace:^` 改写为 `^1.1.0`（详见下节「发布」）。
+本仓库形态为 dsh bundle：根包 `package.json` 声明 `dsh.bundle.patch`（Loader 插入一行插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。仓库为单包，无 workspace 依赖。
 基于 dsh `0.2.2-rc.1` 开发，兼容 dsh `0.2.2-alpha.2` 及以上版本。（`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`）。
 
 **通过 npm 安装（推荐）**：
@@ -81,7 +81,7 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 dsh plugin --profile web add @tak1208/dsh-webui-transition
 ```
 
-一条命令会同时装好根包与它依赖的设置包。也可以让 dsh 的 `plugin_manager` 工具直接安装 npm 包：
+一条命令即可装好。也可以让 dsh 的 `plugin_manager` 工具直接安装 npm 包：
 
 ```json
 { "action": "install_bundle", "target": "@tak1208/dsh-webui-transition" }
@@ -91,11 +91,11 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 - 安装成功后插件会出现在 Settings → 内置插件清单里。
 - 卸载：`dsh plugin --profile web remove @tak1208/dsh-webui-transition`（或用 `plugin_manager` 的 `remove_bundle`）。
 
-**从源码安装（开发期 / 未发布时）**：本仓库是 pnpm workspace（根包 + `packages/dsh-webui-transition-settings`）。由于根包用 `workspace:^` 依赖设置包，**直接对仓库绝对路径执行 `install_bundle` 会因 workspace 协议失败**。开发期联调方式：
+**从源码安装（开发期 / 未发布时）**：本仓库是单包（无 workspace 依赖），可直接把仓库绝对路径装进 profile：
 
-1. 先 `pnpm install && pnpm build` 生成两个 `client.js`；
-2. 把两个包分别 link / 安装进 profile（或先发布设置包的预发布版，再装根包）；
-3. 发布顺序：先 `dsh-webui-transition-settings`，后 `dsh-webui-transition`。
+1. 先 `pnpm install && pnpm build` 生成 `client.js`；
+2. `dsh plugin --profile web add /path/to/dsh-webui-transition`；
+3. 刷新 GUI 页面即可生效。
 
 ## 退出开关
 
@@ -117,10 +117,10 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 
 - 只做两类语义表面：各级下拉菜单与 `role="dialog"` 面板（设置面板、Agent Team 看板等）。不做消息入场/流式渲染/平滑滚动，不做设置面板内 tab 切换、开关与指示条，不做菜单翻页。
 - 不做平台原生方案（CSS Anchor Positioning / View Transitions / clip-path 全 rect morph）、不做 FLIP、不处理 iframe / Shadow DOM 内的表面。
-- 不注册 slot、不渲染组件（设置插件除外）；主插件纯观察 + WAAPI。
+- 除插件详情页配置表单（`plugins.bundle.config`）外，不注册其它 slot；动画部分纯观察 + WAAPI。
 - 不修改宿主卸载时序（退场全部走幽灵副本，不使用延迟卸载补丁）。
 - 不修改 dsh 源码，不往 profile 写入 `package.json` / `cordis.patch.yml`。
-- 版本基线为 dsh `0.2.2-alpha.2`；暂不支持更旧的 dsh 版本。dsh 升级（尤其 0.3.0 及以上）后需重新检查语义选择器、`settings.section` 与客户端契约。
+- 版本基线为 dsh `0.2.2-alpha.2`；暂不支持更旧的 dsh 版本。dsh 升级（尤其 0.3.0 及以上）后需重新检查语义选择器、`plugins.bundle.config` 与客户端契约。
 - 覆盖范围依赖宿主语义 DOM（`role="menu"`、`role="dialog"` + `[data-shortcut-modal="settings"]`）；宿主改动语义结构会影响覆盖面。
 - 触发源推断是启发式的：保留 2.5s 新鲜度、24px 邻接闸门与 1400px 距离上限；无法确认时宁可走回退，不猜。
 - 玻璃表面的 `backdrop-filter`（如菜单的 `.material` 层）在过渡期间保持模糊：菜单的淡入淡出下沉到直接子级、退场幽灵不再剥离 `backdrop-filter`，因此入场/退场动画全程都在采样页面背景。
@@ -130,30 +130,27 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 
 ## 实现架构与开发
 
-仓库是 pnpm workspace，两个包：
+仓库是单包，一个 dsh bundle + 一个 client 插件：
 
-- 根包 `@tak1208/dsh-webui-transition`：bundle + 主 client 插件。源码是 `src/` 下的 ESM 模块，一个文件一个职责：`defs.js`（常量与 `SURFACE_DEFS` 表面描述符）、`utils.js`（通用小工具）、`policy.js`（createPolicy：token / reduced-motion / 读取设置计算最终时长与几何参数）、`tracker.js`（表面状态机与 DOM 分类）、`gate.js`（WAAPI / CSS animation / CSS transition 冲突门卫）、`settings.js`（localStorage 设置契约：回退方式 + 三个可调参数 + 分表面组，逐字段清洗与 clamp）、`origin.js`（交互捕获、触发源解析与 origin 几何）、`marker.js`（表面级中心原点标记契约与中心几何）、`frames.js`（纯关键帧函数，含原点感知几何、伪元素玻璃拆分与 timing 覆盖）、`runtime.js`（观察、批量、入场与退场幽灵）、`browser.js`（浏览器入口，注册到 `window.__ModuleLoader__`）。入口经 esbuild 打包为根目录的 classic iife 产物 `client.js`。
-- 设置包 `packages/dsh-webui-transition-settings`：独立 client 插件，`src/browser.js` 注册 `settings.section` 设置页与 `settings.section.icon` 导航图标（组件由 `pnpm build` 从 `assets/icons/outline.svg` 生成 `src/nav-icon.js`），`src/settings-page.js` 用 `@deepseek-ai/dsh-client-ui-primitives` 的 `SegmentedControl`（回退方式）、`SegmentedTabs`（全局 / 分表面目标）与 `SettingsValueField`（三个数字字段）渲染，`src/contract.js` 与主包 `src/settings.js` 各自独立实现同一份设置契约（由 `test/contract.test.mjs` 防漂移），`src/panel-marker.js` 观察 `document.body` 给设置面板打中心原点标记。构建产物是该包的 `client.js`（esbuild cjs 包进 `__ModuleLoader__.load` factory）。
+- `@tak1208/dsh-webui-transition`：bundle + client 插件。源码是 `src/` 下的 ESM 模块，一个文件一个职责：`defs.js`（常量与 `SURFACE_DEFS` 表面描述符）、`utils.js`（通用小工具）、`policy.js`（createPolicy：token / reduced-motion / 读取设置计算最终时长与几何参数）、`tracker.js`（表面状态机与 DOM 分类）、`gate.js`（WAAPI / CSS animation / CSS transition 冲突门卫）、`settings.js`（localStorage 设置契约：回退方式 + 三个可调参数 + 分表面组，逐字段清洗与 clamp）、`settings-page.js`（React 配置页：`SegmentedControl` 回退方式 + `SegmentedTabs` 全局 / 分表面目标 + `SettingsValueField` 三个数字字段）、`settings-locale.js`（配置页 zh/en 文案）、`panel-marker.js`（观察 `document.body` 给设置面板打中心原点标记）、`origin.js`（交互捕获、触发源解析与 origin 几何）、`marker.js`（表面级中心原点标记契约与中心几何）、`frames.js`（纯关键帧函数，含原点感知几何、伪元素玻璃拆分与 timing 覆盖）、`runtime.js`（观察、批量、入场与退场幽灵）、`browser.js`（唯一入口：运行时 + 配置页注册 + 打标）。入口经 esbuild 打成 cjs，再包进 `__ModuleLoader__.load({ id, factory })`，产出根目录的 classic script `client.js`。
 
-两个 `client.js` 都是构建产物，由 `pnpm build` 生成，**不要手改**；改实现请改 `src/` 后重新构建。
+`client.js` 是构建产物，由 `pnpm build` 生成，**不要手改**；改实现请改 `src/` 后重新构建。
 
 ```bash
 pnpm install
-pnpm build   # 主插件 iife + 设置插件 factory 两个产物
+pnpm build   # 唯一产物 client.js
 pnpm test    # pretest 先构建，再跑 node --test
 ```
 
-测试用 Node 内置 `node --test` + `jsdom`：`test/helpers/env.mjs` 负责 jsdom 装配、fake `__ModuleLoader__`、fake `animate`、fake storage 等，每个 `src/` 模块对应一个测试文件；`bundle.test.mjs` 对两个构建产物做 classic 契约冒烟，`contract.test.mjs` 比对两包设置契约，`settings-page.test.mjs` / `settings-plugin.test.mjs` 覆盖设置页与 slot 注册。
+测试用 Node 内置 `node --test` + `jsdom`：`test/helpers/env.mjs` 负责 jsdom 装配、fake `__ModuleLoader__`、fake `animate`、fake storage 等，每个 `src/` 模块对应一个测试文件；`bundle.test.mjs` 对构建产物做 classic 契约冒烟与 `apply` 装配断言，`panel-marker.test.mjs` 覆盖设置面板打标，`settings-page.test.mjs` 覆盖配置页渲染、字段提交与跨标签同步。
 
 ## 发布
 
-两个包必须按序发布：先 `@tak1208/dsh-webui-transition-settings`，后根包 `@tak1208/dsh-webui-transition`（根包依赖设置包的 `^1.1.0`）。
-
-打包必须经 pnpm：`pnpm publish`，或 `pnpm pack` 生成 tarball 后 `npm publish <tarball>`（需要 npm 的 2FA 网页认证时走后者）。**不要用 `npm pack` / `npm publish` 直接从目录发布**：npm 不改写 `workspace:` 协议，tarball 里会原样带着 `workspace:^`，消费者安装直接失败（`EUNSUPPORTEDPROTOCOL`: `Unsupported URL Type "workspace:"`）。
+单包发布：直接 `pnpm publish`；需要 npm 的 2FA 网页认证时可 `pnpm pack` 生成 tarball 后 `npm publish <tarball>`。发布前确认 `client.js` 已重建且与提交一致。
 
 ## CI
 
-GitHub Actions（`.github/workflows/ci.yml`）在 PR 与 `main` / `feat/**` push 上执行：`pnpm install --frozen-lockfile` → `pnpm build` → `pnpm test` → 校验两个 `client.js` 与提交一致。不安装 dsh、不 publish、不写 secrets。
+GitHub Actions（`.github/workflows/ci.yml`）在 PR 与 `main` / `feat/**` push 上执行：`pnpm install --frozen-lockfile` → `pnpm build` → `pnpm test` → 校验 `client.js` 与提交一致。不安装 dsh、不 publish、不写 secrets。
 
 ## 许可
 
