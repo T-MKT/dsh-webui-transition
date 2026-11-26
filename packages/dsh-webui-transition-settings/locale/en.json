@@ -1,6 +1,0 @@
-{
-  "meta": {
-    "title": "Transition settings",
-    "description": "Adds a Transitions page to Settings for choosing the fallback when no trigger element can be inferred, and for tuning animation duration, initial scale, and opacity start."
-  }
-}
