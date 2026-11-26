@@ -182,11 +182,11 @@ createSettingsPage({ readSettings, writeSettings, emit }) => React 组件（读 
 
 #### 3.3.3 GUI 验证（人工）
 
-- [ ] 刷新 `http://127.0.0.1:3080`，打开 插件管理（侧栏 Plugins）→ `@tak1208/dsh-webui-transition` 详情页，确认描述下方出现过渡动画表单，改一项后立即生效。
-- [ ] 打开 Settings，确认侧栏既无「过渡动画」行，也无空白项。
+- [x] 刷新 `http://127.0.0.1:3080`，打开 插件管理（侧栏 Plugins）→ `@tak1208/dsh-webui-transition` 详情页，确认描述下方出现过渡动画表单，改一项后立即生效。
+- [x] 打开 Settings，确认侧栏既无「过渡动画」行，也无空白项。
 - **完成判据**：两处现象符合预期；若表单未出现，先查 `git diff client.js` 与 bundle 详情页是否有 `data-plugin-config` 段。
 
 ### 3.4 提交
 
-- [ ] 分两次提交：先 `docs(plan): v1.2.0 设置改为插件详情页内嵌`，再 `feat(v1.2.0): 设置并入单一插件并改为插件详情页配置（完成 plan §3.1-3.3）`；不 push。
+- [x] 分两次提交：先 `docs(plan): v1.2.0 设置改为插件详情页内嵌`，再 `feat(v1.2.0): 设置并入单一插件并改为插件详情页配置（完成 plan §3.1-3.3）`；不 push。
 - **完成判据**：`git status` 干净，`git log --oneline -2` 显示上述两条。
