@@ -3,9 +3,6 @@
 ## 环境要求
 项目全局使用 `pnpm` 进行操作。
 
-当前项目基线 `dsh` 版本：`0.2.2-rc.1`
-当前项目兼容 `dsh` 版本：`0.2.2-rc.1`
-
 常用命令：`pnpm build`（打唯一产物：`src/browser.js` → `client.js`）、`pnpm test`（先构建，再跑 `node --test`）。
 
 发布：单包用 pnpm 发布（`pnpm publish`，或 `pnpm pack` 后 `npm publish <tarball>`）。发布前确认 `client.js` 已重建。
@@ -22,20 +19,12 @@
 
 ```text
 dsh-webui-transition/                         # 根包 = bundle + 主 client 插件
-├── .agents/plan/
-│   ├── v0.1.0/                               # 历史真源（保留，只读，不作开发依据）
-│   │   ├── webui-transition.md
-│   │   ├── blur-during-transition.md
-│   │   └── compatible-with-0.2.2-alpha.2.md
-│   ├── v0.2.0/
-│   │   ├── plan-b-rewrite.md                 # v0.2.0 主体真源（ESM 重写计划）
-│   │   └── pseudo-glass-blur.md              # v0.2.0 伪元素玻璃模糊修复真源
-│   ├── v0.3.0/
-│   │   └── origin-aware-and-settings.md      # v0.3.0 真源（原点感知 + 设置插件 + CI）
-│   ├── v1.1.0/
-│   │   └── animation-params.md               # v1.1.0 真源（可调配动画参数：时长 / 缩放 / 透明度）
-│   └── v1.2.0/
-│       └── plugin-page-config.md             # v1.2.0 真源（设置并入插件详情页、回到单包）
+├── .agents/plan/                             # 为 agent 编写的计划文档 
+│   ├── v0.1.0/...
+│   ├── v0.2.0/...
+│   ├── v0.3.0/...
+│   ├── v1.1.0/...
+│   └── v1.2.0/...
 ├── .github/workflows/ci.yml                  # CI：install / build / test / 产物一致性
 ├── assets/icons/logo.png                     # 插件清单图标（package.json.icon）
 ├── src/                                      # ESM 源码（esbuild 入口：src/browser.js）
@@ -77,6 +66,5 @@ dsh-webui-transition/                         # 根包 = bundle + 主 client 插
 ├── cordis.patch.yml                          # Loader 补丁：insert 一行（主插件）
 ├── index.js                                  # Host 半区：空 apply()（占位，满足 bundle 行）
 ├── client.js                                 # 唯一构建产物（pnpm build 生成，不手改）
-├── README.md / README.en.md                  # 中英文说明（安装、效果、设置、退出开关、已知边界）
-└── COMPATIBLE_VERSION                        # 兼容的 dsh 版本与检查日期
+└── README.md / README.en.md                  # 中英文说明（安装、效果、设置、退出开关、已知边界）
 ```
