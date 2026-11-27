@@ -12,7 +12,13 @@
 
 为 DSH（DeepSeek Harness）Web GUI 补上两处开合过渡动画的第三方客户端插件：各级下拉菜单与设置面板。它是一个 dsh bundle，纯浏览器半区运行，不修改 dsh 源码、无第三方运行时依赖。
 
-v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素时，以「触发元素离弹层最近的边/点」为 `transform-origin` 缩放；退场复用入场缓存的 origin。猜不到触发源时按设置回退：**仅淡入**（默认）或**点击原点**。v1.0.0 起设置面板改为**正中心缩放**：面板以自身正中心为 `transform-origin` 缩放 + 淡入，不依赖触发源（由插件自身在面板上打 `data-dsh-transition-origin="center"` 标记，动画逻辑只识别标记）。v1.1.0 起动画**时长、初始缩放、透明度起点**均可调配（全局默认 + 按表面组覆盖，修改即时生效）。v1.2.0 起设置表单内嵌在**插件管理**：打开侧栏 Plugins → `@tak1208/dsh-webui-transition` 详情页即可配置（Settings 侧栏不再有该页），仓库回到单包。
+v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素时，以**触发元素离弹层最近的边/点**为 `transform-origin` 缩放；退场复用入场缓存的 origin。猜不到触发源时按设置回退：**仅淡入**（默认）或**点击原点**。
+
+v1.0.0 起设置面板改为**正中心缩放**：面板以自身正中心为 `transform-origin` 缩放 + 淡入，不依赖触发源（由插件自身在面板上打 `data-dsh-transition-origin="center"` 标记，动画逻辑只识别标记）。
+
+v1.1.0 起动画**时长、初始缩放、透明度起点**均可调配（全局默认 + 按表面组覆盖，修改即时生效）。
+
+v2.0.0 起设置表单内嵌在**插件管理**：打开左侧栏“插件”页 → `@tak1208/dsh-webui-transition` 详情页即可配置。
 
 ## 效果范围
 
@@ -73,7 +79,7 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 ## 安装
 
 本仓库形态为 dsh bundle：根包 `package.json` 声明 `dsh.bundle.patch`（Loader 插入一行插件）与 `dsh.client`（浏览器半区，指向构建产物 `client.js`，classic script）。仓库为单包，无 workspace 依赖。
-基于 dsh `0.2.2-rc.1` 开发，兼容 dsh `0.2.2-alpha.2` 及以上版本。（`engines.dsh: ">=0.2.2-alpha.2 <0.3.0"`）。
+兼容 dsh `0.2.3-alpha.1` 及以上版本。
 
 **通过 npm 安装（推荐）**：
 
@@ -81,20 +87,13 @@ v0.3.0 起动画改为**原点感知**（origin-aware）：能推断触发元素
 dsh plugin --profile web add @tak1208/dsh-webui-transition
 ```
 
-一条命令即可装好。也可以让 dsh 的 `plugin_manager` 工具直接安装 npm 包：
 
-```json
-{ "action": "install_bundle", "target": "@tak1208/dsh-webui-transition" }
-```
+卸载：`dsh plugin --profile web remove @tak1208/dsh-webui-transition`。
 
-- 0.2.1-alpha.2 起 dsh 不允许直接覆盖安装已安装的包（会返回 `already-installed`）；重装请先 `action: "remove_bundle"`，再 `install_bundle`。
-- 安装成功后插件会出现在 Settings → 内置插件清单里。
-- 卸载：`dsh plugin --profile web remove @tak1208/dsh-webui-transition`（或用 `plugin_manager` 的 `remove_bundle`）。
-
-**从源码安装（开发期 / 未发布时）**：本仓库是单包（无 workspace 依赖），可直接把仓库绝对路径装进 profile：
+**从源码安装（开发期）**：本仓库是单包（无 workspace 依赖），可直接把仓库绝对路径装进 profile：
 
 1. 先 `pnpm install && pnpm build` 生成 `client.js`；
-2. `dsh plugin --profile web add /path/to/dsh-webui-transition`；
+2. `dsh plugin --profile web add link:/path/to/dsh-webui-transition`；
 3. 刷新 GUI 页面即可生效。
 
 ## 退出开关
@@ -111,16 +110,13 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 
 ## 减少动态效果
 
-系统开启「减少动态效果」（`prefers-reduced-motion: reduce`）时，不播放任何动画、不生成幽灵节点。运行中开启会立即取消正在播放的动画并清除退场幽灵；此后新动画自动保持不播，关闭该设置后新动画恢复播放。
+系统开启“减少动态效果”（`prefers-reduced-motion: reduce`）时，不播放任何动画、不生成幽灵节点。运行中开启会立即取消正在播放的动画并清除退场幽灵；此后新动画自动保持不播，关闭该设置后新动画恢复播放。
 
 ## 已知边界
 
-- 只做两类语义表面：各级下拉菜单与 `role="dialog"` 面板（设置面板、Agent Team 看板等）。不做消息入场/流式渲染/平滑滚动，不做设置面板内 tab 切换、开关与指示条，不做菜单翻页。
+- 只做两类语义表面：各级下拉菜单与 `role="dialog"` 面板（设置面板、Agent Team 看板等）。不做设置面板内 tab 切换、开关与指示条，不做菜单翻页。
 - 不做平台原生方案（CSS Anchor Positioning / View Transitions / clip-path 全 rect morph）、不做 FLIP、不处理 iframe / Shadow DOM 内的表面。
 - 除插件详情页配置表单（`plugins.bundle.config`）外，不注册其它 slot；动画部分纯观察 + WAAPI。
-- 不修改宿主卸载时序（退场全部走幽灵副本，不使用延迟卸载补丁）。
-- 不修改 dsh 源码，不往 profile 写入 `package.json` / `cordis.patch.yml`。
-- 版本基线为 dsh `0.2.2-alpha.2`；暂不支持更旧的 dsh 版本。dsh 升级（尤其 0.3.0 及以上）后需重新检查语义选择器、`plugins.bundle.config` 与客户端契约。
 - 覆盖范围依赖宿主语义 DOM（`role="menu"`、`role="dialog"` + `[data-shortcut-modal="settings"]`）；宿主改动语义结构会影响覆盖面。
 - 触发源推断是启发式的：保留 2.5s 新鲜度、24px 邻接闸门与 1400px 距离上限；无法确认时宁可走回退，不猜。
 - 玻璃表面的 `backdrop-filter`（如菜单的 `.material` 层）在过渡期间保持模糊：菜单的淡入淡出下沉到直接子级、退场幽灵不再剥离 `backdrop-filter`，因此入场/退场动画全程都在采样页面背景。
@@ -130,9 +126,22 @@ dsh plugin --profile web add @tak1208/dsh-webui-transition
 
 ## 实现架构与开发
 
-仓库是单包，一个 dsh bundle + 一个 client 插件：
+仓库是单包，一个 dsh bundle + 一个 client 插件。源码是 `src/` 下的 ESM 模块，一个文件一个职责：
 
-- `@tak1208/dsh-webui-transition`：bundle + client 插件。源码是 `src/` 下的 ESM 模块，一个文件一个职责：`defs.js`（常量与 `SURFACE_DEFS` 表面描述符）、`utils.js`（通用小工具）、`policy.js`（createPolicy：token / reduced-motion / 读取设置计算最终时长与几何参数）、`tracker.js`（表面状态机与 DOM 分类）、`gate.js`（WAAPI / CSS animation / CSS transition 冲突门卫）、`settings.js`（localStorage 设置契约：回退方式 + 三个可调参数 + 分表面组，逐字段清洗与 clamp）、`settings-page.js`（React 配置页：`SegmentedControl` 回退方式 + `SegmentedTabs` 全局 / 分表面目标 + `SettingsValueField` 三个数字字段）、`settings-locale.js`（配置页 zh/en 文案）、`panel-marker.js`（观察 `document.body` 给设置面板打中心原点标记）、`origin.js`（交互捕获、触发源解析与 origin 几何）、`marker.js`（表面级中心原点标记契约与中心几何）、`frames.js`（纯关键帧函数，含原点感知几何、伪元素玻璃拆分与 timing 覆盖）、`runtime.js`（观察、批量、入场与退场幽灵）、`browser.js`（唯一入口：运行时 + 配置页注册 + 打标）。入口经 esbuild 打成 cjs，再包进 `__ModuleLoader__.load({ id, factory })`，产出根目录的 classic script `client.js`。
+- `defs.js`（常量与 `SURFACE_DEFS` 表面描述符）
+- `utils.js`（通用小工具）
+- `policy.js`（createPolicy：token / reduced-motion / 读取设置计算最终时长与几何参数）
+- `tracker.js`（表面状态机与 DOM 分类）
+- `gate.js`（WAAPI / CSS animation / CSS transition 冲突门卫）
+- `settings.js`（localStorage 设置契约：回退方式 + 三个可调参数 + 分表面组，逐字段清洗与 clamp）
+- `settings-page.js`（React 配置页：`SegmentedControl` 回退方式 + `SegmentedTabs` 全局 / 分表面目标 + `SettingsValueField` 三个数字字段）
+- `settings-locale.js`（配置页 zh/en 文案）
+- `panel-marker.js`（观察 `document.body` 给设置面板打中心原点标记）
+- `origin.js`（交互捕获、触发源解析与 origin 几何）
+- `marker.js`（表面级中心原点标记契约与中心几何）
+- `frames.js`（纯关键帧函数，含原点感知几何、伪元素玻璃拆分与 timing 覆盖）
+- `runtime.js`（观察、批量、入场与退场幽灵）
+`browser.js`（唯一入口：运行时 + 配置页注册 + 打标）。入口经 esbuild 打成 cjs，再包进 `__ModuleLoader__.load({ id, factory })`，产出根目录的 classic script `client.js`。
 
 `client.js` 是构建产物，由 `pnpm build` 生成，**不要手改**；改实现请改 `src/` 后重新构建。
 
